@@ -1,3 +1,4 @@
+import { VERSION } from '../components/UpdateBanner';
 import { AppData, exportJson, freshData } from '../lib/store';
 
 type Props = { data: AppData; setData: React.Dispatch<React.SetStateAction<AppData>> };
@@ -38,6 +39,7 @@ export default function SettingsScreen({ data, setData }: Props) {
         <button className="ghost wide" onClick={() => { if (confirm('Erase all local data on this device? Export first if you want a copy.')) setData(freshData()); }}>Reset all data</button>
         <p className="muted">Movement library editor, rep ranges, injury flags, targets and restore arrive in M3.</p>
       </div>
+      <p className="version">Workout Tracker {VERSION}</p>
     </section>
   );
 }

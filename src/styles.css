@@ -115,3 +115,5 @@ h4 { margin: 14px 0 4px; font-size: 14px; }
 .swap-name { margin: 8px 0; }
 .swap-total { font-size: 15px; color: var(--muted); }
 .swap-total b { font-size: 48px; color: var(--text); }
+.update-banner { position: sticky; top: 0; z-index: 20; display: block; width: 100%; border: none; background: var(--active); color: #fff; font-weight: 700; padding: 12px; }
+.version { text-align: center; font-size: 12px; color: var(--muted); margin: 16px 0; }

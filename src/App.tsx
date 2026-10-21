@@ -3,6 +3,7 @@ import { useAppData } from './lib/store';
 import Today from './screens/Today';
 import History from './screens/History';
 import SettingsScreen from './screens/Settings';
+import UpdateBanner from './components/UpdateBanner';
 import Summary, { weekCount } from './screens/Summary';
 
 type Tab = 'today' | 'history' | 'summary' | 'settings';
@@ -15,6 +16,7 @@ export default function App() {
 
   return (
     <div className="app">
+      <UpdateBanner />
       <main>
         {tab === 'today' && <Today data={data} setData={setData} />}
         {tab === 'history' && <History data={data} />}
