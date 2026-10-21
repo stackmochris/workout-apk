@@ -159,3 +159,6 @@ h4 { margin: 14px 0 4px; font-size: 14px; }
 .body-form { display: grid; grid-template-columns: 1fr 1fr 1fr auto; gap: 6px; margin: 8px 0; }
 .body-form input { padding: 10px 6px; }
 .tabs button { max-width: 112px; }
+label.file { text-align: center; position: relative; }
+label.file input { position: absolute; inset: 0; opacity: 0; width: 100%; max-width: none; cursor: pointer; }
+.form label.file { justify-content: center; }

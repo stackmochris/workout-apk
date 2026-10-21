@@ -15,7 +15,7 @@ function SessionCard({ s }: { s: Session }) {
         <p key={m.movementId} className="hist-line"><span>{m.name}</span>
           <span className="muted">{s.swap ? m.sets.map((x) => x.reps ?? 0).join(' + ')
             : s.type === 'GVT' ? blocks(m.sets).map(blockLabel).join(', ')
-            : m.sets.filter((x) => x.done).map((x) => `${x.weight ?? '–'}×${x.reps ?? '–'}`).join('  ')}</span></p>
+            : m.sets.filter((x) => x.done).map((x) => `${x.kind && x.kind !== 'working' ? `${x.kind[0].toUpperCase()} ` : ''}${x.weight ?? '–'}×${x.reps ?? '–'}`).join('  ')}</span></p>
       ))}
       {s.gvtRepsPerMinute && <p className="muted">GVT: {s.gvtRepsPerMinute.reduce((a, b) => a + b, 0)} reps over {s.gvtRepsPerMinute.length} min</p>}
     </article>
@@ -91,7 +91,7 @@ export default function History({ data }: { data: AppData }) {
             const m = s.movements.find((x) => x.movementId === mid)!;
             return (
               <p key={s.id} className="card hist-line"><span>{new Date(s.date).toLocaleDateString()}</span>
-                <span>{s.type === 'GVT' ? blocks(m.sets).map(blockLabel).join(', ') : m.sets.filter((x) => x.done).map((x) => `${x.weight ?? '–'}×${x.reps ?? '–'}`).join('  ')}</span></p>
+                <span>{s.type === 'GVT' ? blocks(m.sets).map(blockLabel).join(', ') : m.sets.filter((x) => x.done).map((x) => `${x.kind && x.kind !== 'working' ? `${x.kind[0].toUpperCase()} ` : ''}${x.weight ?? '–'}×${x.reps ?? '–'}`).join('  ')}</span></p>
             );
           })}
         </>
