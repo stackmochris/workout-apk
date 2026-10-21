@@ -1,16 +1,22 @@
 import { useEffect, useRef, useState } from 'react';
-import { beep, buzz } from '../lib/audio';
+import { beep } from '../lib/audio';
+import { alerts } from '../lib/alerts';
 
-export default function RestTimer({ seconds, sound, vibrate, trigger }: { seconds: number; sound: boolean; vibrate: boolean; trigger: number }) {
+export interface RestCue { n: number; seconds: number; label?: string }
+
+/** Rest countdown. A new cue (n changes) restarts it; it starts by itself when a set is ticked. */
+export default function RestTimer({ cue, sound, vibrate }: { cue: RestCue; sound: boolean; vibrate: boolean }) {
   const [left, setLeft] = useState<number | null>(null);
   const endAt = useRef(0);
+  const label = cue.label ?? 'Rest';
 
   useEffect(() => {
-    if (trigger > 0) {
-      endAt.current = Date.now() + seconds * 1000;
-      setLeft(seconds);
+    if (cue.n > 0) {
+      endAt.current = Date.now() + cue.seconds * 1000;
+      setLeft(cue.seconds);
+      alerts.running(endAt.current, label);
     }
-  }, [trigger, seconds]);
+  }, [cue.n]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (left == null) return;
@@ -20,23 +26,22 @@ export default function RestTimer({ seconds, sound, vibrate, trigger }: { second
       if (l > 0 && l <= 3 && sound) beep('tick');
       if (l === 0) {
         clearInterval(id);
-        if (sound) beep('done');
-        if (vibrate) buzz([200, 100, 200]);
+        alerts.finished(label, { sound, vibrate });
         setTimeout(() => setLeft(null), 1500);
       }
     }, 1000);
     return () => clearInterval(id);
-  }, [left == null]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [left == null, cue.n]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (left == null) return null;
   const mm = Math.floor(left / 60);
   const ss = String(left % 60).padStart(2, '0');
   return (
     <div className={`rest ${left <= 10 ? 'warn' : ''} ${left === 0 ? 'go' : ''}`}>
-      <span>Rest</span>
+      <span>{label}</span>
       <strong>{left === 0 ? 'Go' : `${mm}:${ss}`}</strong>
-      <button onClick={() => { endAt.current += 15000; setLeft((l) => (l ?? 0) + 15); }}>+15s</button>
-      <button onClick={() => setLeft(null)}>Skip</button>
+      <button onClick={() => { endAt.current += 15000; setLeft((l) => (l ?? 0) + 15); alerts.running(endAt.current, label); }}>+15s</button>
+      <button onClick={() => { setLeft(null); alerts.cancel(); }}>Skip</button>
     </div>
   );
 }

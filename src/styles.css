@@ -117,3 +117,23 @@ h4 { margin: 14px 0 4px; font-size: 14px; }
 .swap-total b { font-size: 48px; color: var(--text); }
 .update-banner { position: sticky; top: 0; z-index: 20; display: block; width: 100%; border: none; background: var(--active); color: #fff; font-weight: 700; padding: 12px; }
 .version { text-align: center; font-size: 12px; color: var(--muted); margin: 16px 0; }
+/* Pass 3: thumb-sized logging */
+.sets-h, .set { grid-template-columns: 44px 1fr 1fr 56px; }
+.set input { height: 50px; font-size: 18px; text-align: center; font-variant-numeric: tabular-nums; }
+.tick { height: 50px; font-size: 20px; }
+.setno { height: 50px; border-radius: 10px; border: 1px dashed var(--border); background: none; color: var(--muted); font-weight: 700; }
+.setno.warmup { color: #3b82c4; border-color: #3b82c4; border-style: solid; }
+.setno.drop { color: var(--gvt); border-color: var(--gvt); border-style: solid; }
+.setno.failure { color: var(--danger); border-color: var(--danger); border-style: solid; }
+.swipe-wrap { position: relative; border-radius: 10px; overflow: hidden; }
+.swipe-under { position: absolute; inset: 0; display: flex; align-items: center; padding: 0 14px; font-weight: 700; font-size: 13px; color: #fff; }
+.swipe-under.right { background: var(--accent); }
+.swipe-under.left { background: var(--danger); justify-content: flex-end; }
+.set { position: relative; background: var(--surface); touch-action: pan-y; transition: transform .15s; }
+.suggest { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; margin: 8px 0 0; font-size: 13px; color: var(--muted); }
+.suggest b { color: var(--active); font-size: 14px; }
+.suggest .plates { background: var(--good-bg); color: var(--active); border-radius: 6px; padding: 1px 6px; }
+.card.superset { border-left: 4px solid #3b82c4; }
+.ss-tag { display: inline-block; font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: #3b82c4; margin-bottom: 4px; }
+.recovery { margin: 8px 0 0; font-size: 13px; color: #ffd8a8; }
+.primary.wide { min-height: 52px; }

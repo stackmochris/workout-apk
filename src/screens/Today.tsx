@@ -3,8 +3,14 @@ import { completeSession, currentPlan, preview, skipSession } from '../engine/ro
 import { DEFAULT_DAY, FLAG_INFO, SWAP_DEFAULTS } from '../data/movements';
 import { penalisedHint, penaltyState } from '../engine/week';
 import { AppData, previousFor, uid } from '../lib/store';
-import { LoggedMovement, Movement, Session } from '../types';
-import RestTimer from '../components/RestTimer';
+import { LoggedMovement, Movement, Session, SetKind } from '../types';
+import RestTimer, { RestCue } from '../components/RestTimer';
+import SetRow from '../components/SetRow';
+import { suggestNext } from '../engine/progression';
+import { plateLabel, plateLoad } from '../engine/plates';
+import { muscleFatigue, recoveryHint } from '../engine/analytics';
+import { MUSCLES } from '../data/muscles';
+import { buzz } from '../lib/audio';
 import GvtTimer from '../components/GvtTimer';
 import SwapSession from '../components/SwapSession';
 import NumInput from '../components/NumInput';
@@ -27,7 +33,7 @@ export default function Today({ data, setData }: Props) {
   const [gvtKg, setGvtKg] = useState<Record<number, number | null>>({});
   const byId = useMemo(() => new Map(data.movements.map((m) => [m.id, m])), [data.movements]);
   const [picker, setPicker] = useState<{ mode: 'add' | 'swap'; index?: number } | null>(null);
-  const [rest, setRest] = useState(0);
+  const [rest, setRest] = useState<RestCue>({ n: 0, seconds: 0 });
   const [gvtPicks, setGvtPicks] = useState<string[] | null>(null);
   const [swapping, setSwapping] = useState(false);
   const pen = data.settings.penalty;
@@ -54,7 +60,41 @@ export default function Today({ data, setData }: Props) {
       i !== mi ? m : { ...m, sets: m.sets.map((s, j) => (j === si ? updated : s)) },
     );
     saveDraft(movements);
-    if (updated.done && !was) setRest((r) => r + 1);
+    if (updated.done && !was) {
+      if (data.settings.vibrate) buzz(40);
+      cueRest(movements, mi, si);
+    }
+  };
+
+  /** Rest after a ticked set. In a superset, a short hop to the partner card, then full rest after the round. */
+  const cueRest = (movements: LoggedMovement[], mi: number, si: number) => {
+    const full = data.settings.restSeconds;
+    const lm = movements[mi];
+    const group = lm.superset ? movements.map((m, i) => ({ m, i })).filter((x) => x.m.superset === lm.superset) : [];
+    if (group.length > 1) {
+      const pos = group.findIndex((x) => x.i === mi);
+      const partner = group[(pos + 1) % group.length].m;
+      const partnerPending = partner.sets[si] && !partner.sets[si].done;
+      setRest((r) => partnerPending
+        ? { n: r.n + 1, seconds: data.settings.supersetRest, label: `→ ${short(partner.name)}` }
+        : { n: r.n + 1, seconds: full, label: `Rest → ${short(group[0].m.name)}` });
+      return;
+    }
+    setRest((r) => ({ n: r.n + 1, seconds: full, label: 'Rest' }));
+  };
+
+  const setKind = (mi: number, si: number, kind: SetKind) =>
+    saveDraft(draft.movements.map((m, i) => i !== mi ? m : { ...m, sets: m.sets.map((x, j) => j === si ? { ...x, kind: kind === 'working' ? undefined : kind } : x) }));
+
+  const toggleSuperset = (mi: number) => {
+    const lm = draft.movements[mi];
+    if (lm.superset) {
+      const g = lm.superset;
+      saveDraft(draft.movements.map((m) => (m.superset === g ? { ...m, superset: undefined } : m)));
+    } else if (mi + 1 < draft.movements.length) {
+      const g = draft.movements[mi + 1].superset ?? uid();
+      saveDraft(draft.movements.map((m, i) => (i === mi || i === mi + 1 ? { ...m, superset: g } : m)));
+    }
   };
 
   const finish = (status: Session['status'], extra: Partial<Session> = {}) => {
@@ -92,6 +132,9 @@ export default function Today({ data, setData }: Props) {
   };
 
   const next = preview(data.rotation, 4).slice(1);
+  const fatigue = useMemo(() => muscleFatigue(data.sessions, data.movements), [data.sessions, data.movements]);
+  const tired = recoveryHint(plan.focus, fatigue);
+  const label = (id: string) => MUSCLES.find((m) => m.id === id)?.label ?? id;
   const doneCount = draft.movements.filter((m) => m.sets.length && m.sets.every((s) => s.done)).length;
 
   return (
@@ -114,6 +157,7 @@ export default function Today({ data, setData }: Props) {
           {browse && <button className="ghost" onClick={() => { setBrowse(null); setGvtPicks(null); setGvtRun(null); }}>Back to today</button>}
         </div>
         {!onPlan && <p className="muted small">Browsing. Logging this won't move the rotation.</p>}
+        {tired.length > 0 && <p className="recovery">Probably still recovering: {tired.map(label).join(', ')}. Go lighter on those or pick another focus.</p>}
         <p className="next">Up next: {next.map((n) => `${n.focus} · ${n.type}`).join('  →  ')}</p>
       </header>
 
@@ -210,8 +254,11 @@ export default function Today({ data, setData }: Props) {
             const flagged = !!mv?.flags.length;
             const complete = lm.sets.length > 0 && lm.sets.every((s) => s.done);
             const active = !complete && lm.sets.some((s) => s.done || s.reps != null || s.weight != null);
+            const sug = mv ? suggestNext(mv, prev?.sets, { bar: data.settings.barKg, plates: data.settings.plates, extraReps: pen.elbowReps }) : { weight: null, reps: null, reason: 'none' as const };
+            const ssIndex = lm.superset ? draft.movements.filter((m) => m.superset === lm.superset).findIndex((m) => m === lm) : -1;
             return (
-              <article key={mi} className={`card mv ${complete ? 'complete' : active ? 'active' : ''} ${flagged ? 'flagged' : ''}`}>
+              <article key={mi} className={`card mv ${complete ? 'complete' : active ? 'active' : ''} ${flagged ? 'flagged' : ''} ${lm.superset ? 'superset' : ''}`}>
+                {lm.superset && <span className="ss-tag">Superset {String.fromCharCode(65 + ssIndex)}</span>}
                 <div className="mv-head">
                   <div>
                     <h3>{lm.name}</h3>
@@ -219,21 +266,25 @@ export default function Today({ data, setData }: Props) {
                   </div>
                   <button className="ghost" onClick={() => setPicker({ mode: 'swap', index: mi })}>Swap</button>
                 </div>
+                {sug.reason !== 'none' && (
+                  <p className="suggest">
+                    <b>Next: {sug.weight != null ? `${sug.weight} kg × ` : ''}{sug.reps}</b>
+                    <span>{sug.reason === 'add-weight' ? 'Top of range hit. Add weight' : sug.reason === 'add-reps' ? 'Add a rep' : 'Repeat'}</span>
+                    {mv?.equipment === 'barbell' && sug.weight != null && <span className="plates">{plateLabel(plateLoad(sug.weight, data.settings.barKg, data.settings.plates))}</span>}
+                  </p>
+                )}
                 {flagged && mv!.flags.map((f) => <p key={f} className="flag">⚠ {FLAG_INFO[f]?.reminder ?? f}</p>)}
                 <div className="sets">
                   <div className="sets-h"><span>Set</span><span>kg</span><span>Reps</span><span /></div>
                   {lm.sets.map((s, si) => {
-                    const p = prev?.sets[si] ? penalisedHint(mv, prev.sets[si], penalty.multiplier, pen) : undefined;
+                    const prevSet = prev?.sets[si];
+                    const base = (s.kind ?? 'working') !== 'working' || sug.reason === 'none' ? prevSet : { weight: sug.weight, reps: sug.reps };
+                    const p = base ? penalisedHint(mv, base, penalty.multiplier, pen) : { weight: null, reps: null };
                     return (
-                      <div key={si} className={`set ${s.done ? 'done' : ''}`}>
-                        <span>{si + 1}</span>
-                        <NumInput kind="kg" label={`Set ${si + 1} kg`} placeholder={p?.weight != null ? String(p.weight) : 'kg'} value={s.weight}
-                          onChange={(n) => updateSet(mi, si, { weight: n })} />
-                        <NumInput kind="reps" label={`Set ${si + 1} reps`} placeholder={p?.reps != null ? String(p.reps) : 'reps'} value={s.reps}
-                          onChange={(n) => updateSet(mi, si, { reps: n })} />
-                        <button aria-label={s.done ? 'Done. Tap to clear' : 'Same as last time'} title={s.done ? 'Clear set' : 'Use last session'} className={`tick ${s.done ? 'on' : ''}`}
-                          onClick={() => updateSet(mi, si, s.done ? { reps: null } : { reps: p?.reps ?? null, weight: s.weight ?? p?.weight ?? null })}>✓</button>
-                      </div>
+                      <SetRow key={si} index={si} s={s} hint={p}
+                        onEdit={(patch) => updateSet(mi, si, patch)}
+                        onKind={(k) => setKind(mi, si, k)}
+                        onTick={() => updateSet(mi, si, s.done ? { reps: null } : { reps: s.reps ?? p.reps ?? null, weight: s.weight ?? p.weight ?? null })} />
                     );
                   })}
                 </div>
@@ -241,6 +292,9 @@ export default function Today({ data, setData }: Props) {
                   <span className="muted">{prev ? `Last: ${prev.sets.filter((x) => x.done).map((x) => `${x.weight ?? '–'}×${x.reps ?? '–'}`).join(', ')}` : 'No previous session'}</span>
                   <span>
                     <button className="ghost" onClick={() => saveDraft(draft.movements.map((m, i) => i === mi ? { ...m, sets: [...m.sets, { reps: null, weight: null, done: false }] } : m))}>+ Set</button>
+                    {(lm.superset || mi + 1 < draft.movements.length) && (
+                      <button className="ghost" onClick={() => toggleSuperset(mi)}>{lm.superset ? 'Unlink' : 'Superset ↓'}</button>
+                    )}
                     <button className="ghost" onClick={() => saveDraft(draft.movements.filter((_, i) => i !== mi))}>Remove</button>
                   </span>
                 </div>
@@ -256,7 +310,7 @@ export default function Today({ data, setData }: Props) {
         {!swapping && <button className="ghost" onClick={() => setSwapping(true)}>Can't get to the gym?</button>}
       </div>
 
-      <RestTimer seconds={data.settings.restSeconds} sound={data.settings.sound} vibrate={data.settings.vibrate} trigger={rest} />
+      <RestTimer cue={rest} sound={data.settings.sound} vibrate={data.settings.vibrate} />
 
       {picker && (
         <div className="sheet" onClick={() => setPicker(null)}>
@@ -289,3 +343,5 @@ function Picker({ movements, focus, onPick }: { movements: Movement[]; focus: st
     </>
   );
 }
+
+const short = (name: string) => name.split(/[(/]/)[0].trim();
