@@ -255,6 +255,7 @@ export default function Today({ data, setData }: Props) {
             const complete = lm.sets.length > 0 && lm.sets.every((s) => s.done);
             const active = !complete && lm.sets.some((s) => s.done || s.reps != null || s.weight != null);
             const sug = mv ? suggestNext(mv, prev?.sets, { bar: data.settings.barKg, plates: data.settings.plates, extraReps: pen.elbowReps }) : { weight: null, reps: null, reason: 'none' as const };
+            const sugP = penalisedHint(mv, { weight: sug.weight, reps: sug.reps }, penalty.multiplier, pen);
             const ssIndex = lm.superset ? draft.movements.filter((m) => m.superset === lm.superset).findIndex((m) => m === lm) : -1;
             return (
               <article key={mi} className={`card mv ${complete ? 'complete' : active ? 'active' : ''} ${flagged ? 'flagged' : ''} ${lm.superset ? 'superset' : ''}`}>
@@ -268,9 +269,9 @@ export default function Today({ data, setData }: Props) {
                 </div>
                 {sug.reason !== 'none' && (
                   <p className="suggest">
-                    <b>Next: {sug.weight != null ? `${sug.weight} kg × ` : ''}{sug.reps}</b>
-                    <span>{sug.reason === 'add-weight' ? 'Top of range hit. Add weight' : sug.reason === 'add-reps' ? 'Add a rep' : 'Repeat'}</span>
-                    {mv?.equipment === 'barbell' && sug.weight != null && <span className="plates">{plateLabel(plateLoad(sug.weight, data.settings.barKg, data.settings.plates))}</span>}
+                    <b>Next: {sugP.weight != null ? `${sugP.weight} kg × ` : ''}{sugP.reps}</b>
+                    <span>{sug.reason === 'add-weight' ? 'Top of range hit. Add weight' : sug.reason === 'add-reps' ? 'Add a rep' : 'Repeat'}{sugP.addedKg || sugP.addedReps ? ' (incl. penalty)' : ''}</span>
+                    {mv?.equipment === 'barbell' && sugP.weight != null && <span className="plates">{plateLabel(plateLoad(sugP.weight, data.settings.barKg, data.settings.plates))}</span>}
                   </p>
                 )}
                 {flagged && mv!.flags.map((f) => <p key={f} className="flag">⚠ {FLAG_INFO[f]?.reminder ?? f}</p>)}
@@ -279,7 +280,7 @@ export default function Today({ data, setData }: Props) {
                   {lm.sets.map((s, si) => {
                     const prevSet = prev?.sets[si];
                     const base = (s.kind ?? 'working') !== 'working' || sug.reason === 'none' ? prevSet : { weight: sug.weight, reps: sug.reps };
-                    const p = base ? penalisedHint(mv, base, penalty.multiplier, pen) : { weight: null, reps: null };
+                    const p = base ? penalisedHint(mv, base, penalty.multiplier, pen) : { weight: null, reps: (s.kind ?? 'working') === 'working' ? mv?.repMin ?? null : null };
                     return (
                       <SetRow key={si} index={si} s={s} hint={p}
                         onEdit={(patch) => updateSet(mi, si, patch)}
