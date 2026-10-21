@@ -1,41 +1,18 @@
 import { useEffect, useState } from 'react';
-import { initialRotation } from '../engine/rotation';
-import { DEFAULT_PENALTY } from '../engine/week';
-import { SEED_MOVEMENTS } from '../data/movements';
-import { LoggedMovement, Movement, RotationState, Session, Settings } from '../types';
+import { AppData, freshData, migrate } from '../engine/migrate';
+import { bodyCsv, sessionsCsv } from '../engine/csv';
+import { autoSnapshot } from './backup';
+import { LoggedMovement, Session } from '../types';
 
 const KEY = 'workout-apk:v1';
 
-export interface AppData {
-  version: 1;
-  movements: Movement[];
-  rotation: RotationState;
-  sessions: Session[];
-  /** In-progress session for today, keyed by plan so a reload keeps the inputs. */
-  draft: { focus: string; type: string; movements: LoggedMovement[]; gvtRepsPerMinute?: number[] } | null;
-  settings: Settings;
-}
-
-export const DEFAULT_SETTINGS: Settings = {
-  restSeconds: 90,
-  gvt: { sets: 10, reps: 10, seconds: 60 },
-  sound: true,
-  vibrate: true,
-  summaryThreshold: 4,
-  penalty: DEFAULT_PENALTY,
-  targets: { proteinMin: 160, proteinMax: 180, kcalMin: 1950, kcalMax: 2200, waterGlasses: 8 },
-};
-
-export function freshData(): AppData {
-  return { version: 1, movements: SEED_MOVEMENTS, rotation: initialRotation(), sessions: [], draft: null, settings: DEFAULT_SETTINGS };
-}
+export type { AppData } from '../engine/migrate';
+export { DEFAULT_SETTINGS, freshData } from '../engine/migrate';
 
 export function load(): AppData {
   try {
     const raw = localStorage.getItem(KEY);
-    if (!raw) return freshData();
-    const d = JSON.parse(raw);
-    return { ...freshData(), ...d, settings: { ...DEFAULT_SETTINGS, ...d.settings, penalty: { ...DEFAULT_PENALTY, ...d.settings?.penalty } } };
+    return raw ? migrate(JSON.parse(raw)) : freshData();
   } catch {
     return freshData();
   }
@@ -46,16 +23,31 @@ export function useAppData() {
   useEffect(() => {
     localStorage.setItem(KEY, JSON.stringify(data));
   }, [data]);
+  useEffect(() => {
+    const id = setTimeout(() => autoSnapshot(data), 5000);
+    return () => clearTimeout(id);
+  }, [data.sessions, data.body]); // eslint-disable-line react-hooks/exhaustive-deps
   return [data, setData] as const;
 }
 
-export function exportJson(data: AppData) {
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+export function download(name: string, text: string, type: string) {
+  const blob = new Blob([text], { type });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = `workout-backup-${new Date().toISOString().slice(0, 10)}.json`;
+  a.download = name;
   a.click();
-  URL.revokeObjectURL(a.href);
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+
+const stamp = () => new Date().toISOString().slice(0, 10);
+
+export function exportJson(data: AppData) {
+  download(`workout-backup-${stamp()}.json`, JSON.stringify(data, null, 2), 'application/json');
+}
+
+export function exportCsv(data: AppData) {
+  download(`workout-sets-${stamp()}.csv`, sessionsCsv(data.sessions), 'text/csv');
+  if (data.body.length) setTimeout(() => download(`workout-body-${stamp()}.csv`, bodyCsv(data.body), 'text/csv'), 300);
 }
 
 export const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36);

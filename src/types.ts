@@ -17,16 +17,23 @@ export interface Movement {
   equipment?: 'barbell' | 'dumbbell' | 'cable' | 'machine' | 'bodyweight';
 }
 
+export type SetKind = 'warmup' | 'working' | 'drop' | 'failure';
+export const SET_KINDS: SetKind[] = ['working', 'warmup', 'drop', 'failure'];
+
 export interface SetEntry {
   reps: number | null;
   weight: number | null;
   done: boolean;
+  /** Missing = working set (records from before pass 3). */
+  kind?: SetKind;
 }
 
 export interface LoggedMovement {
   movementId: string;
   name: string;
   sets: SetEntry[];
+  /** Superset group id: cards sharing an id alternate under one rest timer. */
+  superset?: string;
 }
 
 export interface Session {
@@ -58,5 +65,23 @@ export interface Settings {
   summaryThreshold: number;
   /** Missed-week load penalty (brief §5.14). */
   penalty: { barbellKg: number; dumbbellCableKg: number; elbowReps: number; stack: boolean };
+  /** Plate calculator. */
+  barKg: number;
+  plates: number[];
+  /** Working sets per muscle per week. */
+  muscleTarget: number;
+  /** Seconds between the two halves of a superset. */
+  supersetRest: number;
+  notifications: boolean;
   targets: { proteinMin: number; proteinMax: number; kcalMin: number; kcalMax: number; waterGlasses: number };
+}
+
+export interface BodyEntry {
+  id: string;
+  date: string; // ISO, local time of the weigh-in
+  weight?: number;
+  bodyFat?: number;
+  waist?: number;
+  author: 'app' | 'assistant';
+  updatedAt: string;
 }
