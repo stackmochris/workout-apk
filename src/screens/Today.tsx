@@ -7,6 +7,10 @@ import { LoggedMovement, Movement, Session } from '../types';
 import RestTimer from '../components/RestTimer';
 import GvtTimer from '../components/GvtTimer';
 import SwapSession from '../components/SwapSession';
+import NumInput from '../components/NumInput';
+import { editSet } from '../engine/sets';
+import { blockLabel, blocks, doneSets, logBlock } from '../engine/gvt';
+import { FOCI, Focus, SessionType } from '../types';
 
 type Props = { data: AppData; setData: React.Dispatch<React.SetStateAction<AppData>> };
 
@@ -15,7 +19,12 @@ function blank(m: Movement): LoggedMovement {
 }
 
 export default function Today({ data, setData }: Props) {
-  const plan = currentPlan(data.rotation);
+  const planned = currentPlan(data.rotation);
+  const [browse, setBrowse] = useState<{ focus: Focus; type: SessionType } | null>(null);
+  const plan = browse ? { ...planned, ...browse } : planned;
+  const onPlan = plan.focus === planned.focus && plan.type === planned.type;
+  const [gvtRun, setGvtRun] = useState<{ index: number; weight: number | null } | null>(null);
+  const [gvtKg, setGvtKg] = useState<Record<number, number | null>>({});
   const byId = useMemo(() => new Map(data.movements.map((m) => [m.id, m])), [data.movements]);
   const [picker, setPicker] = useState<{ mode: 'add' | 'swap'; index?: number } | null>(null);
   const [rest, setRest] = useState(0);
@@ -38,12 +47,14 @@ export default function Today({ data, setData }: Props) {
 
   const saveDraft = (movements: LoggedMovement[]) => setData((d) => ({ ...d, draft: { ...draft, movements } }));
 
-  const updateSet = (mi: number, si: number, patch: Partial<LoggedMovement['sets'][number]>) => {
+  const updateSet = (mi: number, si: number, patch: { reps?: number | null; weight?: number | null }) => {
+    const was = draft.movements[mi].sets[si].done;
+    const updated = editSet(draft.movements[mi].sets[si], patch);
     const movements = draft.movements.map((m, i) =>
-      i !== mi ? m : { ...m, sets: m.sets.map((s, j) => (j === si ? { ...s, ...patch } : s)) },
+      i !== mi ? m : { ...m, sets: m.sets.map((s, j) => (j === si ? updated : s)) },
     );
     saveDraft(movements);
-    if (patch.done) setRest((r) => r + 1);
+    if (updated.done && !was) setRest((r) => r + 1);
   };
 
   const finish = (status: Session['status'], extra: Partial<Session> = {}) => {
@@ -53,16 +64,24 @@ export default function Today({ data, setData }: Props) {
       movements: status === 'completed' ? draft.movements.filter((m) => m.sets.some((s) => s.done) || extra.gvtRepsPerMinute) : [],
       author: 'app', updatedAt: now, ...extra,
     };
-    if (status === 'completed' && !extra.swap && !confirm(`Finish ${plan.focus} (${plan.type}) and advance the rotation?`)) return;
+    if (status === 'completed' && !extra.swap && !confirm(onPlan ? `Finish ${plan.focus} (${plan.type}) and advance the rotation?` : `Log ${plan.focus} (${plan.type})? It is not today's planned session, so the rotation stays put.`)) return;
     if (status === 'skipped' && !confirm(`Skip ${plan.focus}? The plan rolls forward to the next focus.`)) return;
     setData((d) => ({
       ...d,
       sessions: [...d.sessions, session],
-      rotation: status === 'completed' ? completeSession(d.rotation) : skipSession(d.rotation),
+      rotation: !onPlan ? d.rotation : status === 'completed' ? completeSession(d.rotation) : skipSession(d.rotation),
       draft: null,
     }));
     setGvtPicks(null);
+    setGvtRun(null);
+    setGvtKg({});
+    setBrowse(null);
     setSwapping(false);
+  };
+
+  const logGvt = (mi: number, weight: number | null, reps: number[]) => {
+    if (!reps.length) return;
+    saveDraft(draft.movements.map((m, i) => (i === mi ? logBlock(m, weight, reps) : m)));
   };
 
   const pick = (m: Movement) => {
@@ -78,13 +97,23 @@ export default function Today({ data, setData }: Props) {
   return (
     <section>
       <header className={`hero ${plan.type === 'GVT' ? 'gvt-day' : ''}`}>
-        <small>Today</small>
+        <small>{onPlan ? 'Today' : 'Browsing'}</small>
         <h1>{plan.focus}</h1>
         <div className="pills">
           <span className={`pill ${plan.type}`}>{plan.type}</span>
           <span className="pill dim">Cycle {plan.cycleStep}/3</span>
           {plan.type === 'Normal' && <span className="pill dim">{doneCount}/{draft.movements.length} done</span>}
         </div>
+        <div className="browse">
+          <select aria-label="Browse focus" value={plan.focus} onChange={(e) => { setGvtPicks(null); setGvtRun(null); const f = e.target.value as Focus; setBrowse(f === planned.focus && plan.type === planned.type ? null : { focus: f, type: plan.type }); }}>
+            {FOCI.map((f) => <option key={f} value={f}>{f}</option>)}
+          </select>
+          {(['Normal', 'GVT'] as SessionType[]).map((t) => (
+            <button key={t} className={`chip ${plan.type === t ? 'on' : ''}`} onClick={() => { setGvtPicks(null); setGvtRun(null); setBrowse(plan.focus === planned.focus && t === planned.type ? null : { focus: plan.focus, type: t }); }}>{t}</button>
+          ))}
+          {browse && <button className="ghost" onClick={() => { setBrowse(null); setGvtPicks(null); setGvtRun(null); }}>Back to today</button>}
+        </div>
+        {!onPlan && <p className="muted small">Browsing. Logging this won't move the rotation.</p>}
         <p className="next">Up next: {next.map((n) => `${n.focus} · ${n.type}`).join('  →  ')}</p>
       </header>
 
@@ -114,7 +143,7 @@ export default function Today({ data, setData }: Props) {
         />
       ) : plan.type === 'GVT' ? (
         <div className="card gvt-card">
-          {!gvtPicks ? (
+          {!gvtPicks && !draft.movements.slice(0, 3).some((m) => doneSets(m) > 0) ? (
             <>
               <h3>Pick 3 movements</h3>
               <div className="chips">
@@ -133,11 +162,43 @@ export default function Today({ data, setData }: Props) {
                 Start GVT
               </button>
             </>
+          ) : gvtRun ? (
+            <>
+              <h3>{draft.movements[gvtRun.index].name}</h3>
+              <p className="muted">{gvtRun.weight ?? '–'} kg{doneSets(draft.movements[gvtRun.index]) ? ` · ${blocks(draft.movements[gvtRun.index].sets).map(blockLabel).join(', ')} logged` : ''}</p>
+              <GvtTimer key={`${gvtRun.index}-${doneSets(draft.movements[gvtRun.index])}`} {...data.settings.gvt} sound={data.settings.sound} vibrate={data.settings.vibrate}
+                startAt={doneSets(draft.movements[gvtRun.index])} weight={gvtRun.weight} autoStart
+                onAdjust={(reps) => { logGvt(gvtRun.index, gvtRun.weight, reps); setGvtKg((k) => ({ ...k, [gvtRun.index]: null })); setGvtRun(null); }}
+                onFinish={(reps) => { logGvt(gvtRun.index, gvtRun.weight, reps); setGvtRun(null); }} />
+            </>
           ) : (
             <>
-              <p className="muted">{draft.movements.slice(0, 3).map((m) => m.name).join(' · ')}</p>
-              <GvtTimer {...data.settings.gvt} sound={data.settings.sound} vibrate={data.settings.vibrate}
-                onFinish={(rpm) => finish('completed', { movements: draft.movements.slice(0, 3), gvtRepsPerMinute: rpm })} />
+              {draft.movements.slice(0, 3).map((lm, mi) => {
+                const done = doneSets(lm);
+                const total = data.settings.gvt.sets;
+                const prev = previousFor(data.sessions, lm.movementId);
+                const prevKg = prev ? [...prev.sets].reverse().find((x) => x.done && x.weight != null)?.weight : undefined;
+                return (
+                  <article key={lm.movementId} className={`card mv ${done >= total ? 'complete' : done ? 'active' : ''}`}>
+                    <h3>{lm.name}</h3>
+                    {done > 0 && <p className="muted">{blocks(lm.sets).map(blockLabel).join(' · ')}</p>}
+                    {done < total ? (
+                      <div className="gvt-start">
+                        <NumInput kind="kg" label={`${lm.name} kg`} value={gvtKg[mi] ?? null} placeholder={prevKg != null ? String(prevKg) : 'kg'}
+                          onChange={(n) => setGvtKg((k) => ({ ...k, [mi]: n }))} />
+                        <button className="primary" onClick={() => setGvtRun({ index: mi, weight: gvtKg[mi] ?? prevKg ?? null })}>
+                          {done ? `Start set ${done + 1}` : 'Start'}
+                        </button>
+                      </div>
+                    ) : <p className="muted">{total} sets done</p>}
+                  </article>
+                );
+              })}
+              <button className="primary wide" disabled={!draft.movements.slice(0, 3).some((m) => doneSets(m) > 0)}
+                onClick={() => finish('completed', { movements: draft.movements.slice(0, 3).filter((m) => doneSets(m) > 0), gvtRepsPerMinute: draft.movements.slice(0, 3).flatMap((m) => m.sets.filter((x) => x.done).map((x) => x.reps ?? 0)) })}>
+                Finish GVT session
+              </button>
+              <button className="ghost wide" onClick={() => setGvtPicks(null)}>Change movements</button>
             </>
           )}
         </div>
@@ -160,21 +221,18 @@ export default function Today({ data, setData }: Props) {
                 </div>
                 {flagged && mv!.flags.map((f) => <p key={f} className="flag">⚠ {FLAG_INFO[f]?.reminder ?? f}</p>)}
                 <div className="sets">
-                  <div className="sets-h"><span>Set</span><span>Reps</span><span>Weight</span><span /></div>
+                  <div className="sets-h"><span>Set</span><span>kg</span><span>Reps</span><span /></div>
                   {lm.sets.map((s, si) => {
                     const p = prev?.sets[si] ? penalisedHint(mv, prev.sets[si], penalty.multiplier, pen) : undefined;
                     return (
                       <div key={si} className={`set ${s.done ? 'done' : ''}`}>
                         <span>{si + 1}</span>
-                        <input inputMode="numeric" placeholder={p?.reps != null ? String(p.reps) : '–'} value={s.reps ?? ''}
-                          onChange={(e) => updateSet(mi, si, { reps: e.target.value === '' ? null : Number(e.target.value) })} />
-                        <input inputMode="decimal" placeholder={p?.weight != null ? String(p.weight) : 'kg'} value={s.weight ?? ''}
-                          onChange={(e) => updateSet(mi, si, { weight: e.target.value === '' ? null : Number(e.target.value) })} />
-                        <button className={`tick ${s.done ? 'on' : ''}`} onClick={() => updateSet(mi, si, {
-                          done: !s.done,
-                          reps: s.reps ?? p?.reps ?? null,
-                          weight: s.weight ?? p?.weight ?? null,
-                        })}>✓</button>
+                        <NumInput kind="kg" label={`Set ${si + 1} kg`} placeholder={p?.weight != null ? String(p.weight) : 'kg'} value={s.weight}
+                          onChange={(n) => updateSet(mi, si, { weight: n })} />
+                        <NumInput kind="reps" label={`Set ${si + 1} reps`} placeholder={p?.reps != null ? String(p.reps) : 'reps'} value={s.reps}
+                          onChange={(n) => updateSet(mi, si, { reps: n })} />
+                        <button aria-label={s.done ? 'Done. Tap to clear' : 'Same as last time'} title={s.done ? 'Clear set' : 'Use last session'} className={`tick ${s.done ? 'on' : ''}`}
+                          onClick={() => updateSet(mi, si, s.done ? { reps: null } : { reps: p?.reps ?? null, weight: s.weight ?? p?.weight ?? null })}>✓</button>
                       </div>
                     );
                   })}
@@ -194,7 +252,7 @@ export default function Today({ data, setData }: Props) {
         </>
       )}
       <div className="row center">
-        <button className="ghost" onClick={() => finish('skipped')}>Skip {plan.focus} → next focus</button>
+        {onPlan && <button className="ghost" onClick={() => finish('skipped')}>Skip {plan.focus} → next focus</button>}
         {!swapping && <button className="ghost" onClick={() => setSwapping(true)}>Can't get to the gym?</button>}
       </div>
 
