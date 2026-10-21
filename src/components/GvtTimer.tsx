@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { beep, buzz, wakeLock } from '../lib/audio';
+import { alerts } from '../lib/alerts';
 
 const R = 108;
 const CIRC = 2 * Math.PI * R;
@@ -59,11 +60,13 @@ export default function GvtTimer({ sets, reps, seconds, sound, vibrate, onFinish
     setPhase('run');
     tone('start');
     if (vibrate) buzz(150);
+    alerts.running(Date.now() + seconds * 1000, `GVT set ${n} of ${sets}`);
   }
   function finish() {
     setPhase('done');
     tone('done');
     if (vibrate) buzz([300, 100, 300]);
+    alerts.finished('GVT', { sound: false, vibrate: false });
     release.current();
   }
   async function toggle() {

@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { setNotificationsEnabled } from './lib/alerts';
 import { useAppData } from './lib/store';
 import Today from './screens/Today';
 import History from './screens/History';
@@ -10,6 +11,7 @@ type Tab = 'today' | 'history' | 'summary' | 'settings';
 
 export default function App() {
   const [data, setData] = useAppData();
+  useEffect(() => setNotificationsEnabled(data.settings.notifications), [data.settings.notifications]);
   const [tab, setTab] = useState<Tab>('today');
   const done = weekCount(data.sessions);
   const unlocked = done >= data.settings.summaryThreshold;
