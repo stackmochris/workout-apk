@@ -1,0 +1,42 @@
+import { useEffect, useRef, useState } from 'react';
+import { beep, buzz } from '../lib/audio';
+
+export default function RestTimer({ seconds, sound, vibrate, trigger }: { seconds: number; sound: boolean; vibrate: boolean; trigger: number }) {
+  const [left, setLeft] = useState<number | null>(null);
+  const endAt = useRef(0);
+
+  useEffect(() => {
+    if (trigger > 0) {
+      endAt.current = Date.now() + seconds * 1000;
+      setLeft(seconds);
+    }
+  }, [trigger, seconds]);
+
+  useEffect(() => {
+    if (left == null) return;
+    const id = setInterval(() => {
+      const l = Math.max(0, Math.ceil((endAt.current - Date.now()) / 1000));
+      setLeft(l);
+      if (l > 0 && l <= 3 && sound) beep('tick');
+      if (l === 0) {
+        clearInterval(id);
+        if (sound) beep('done');
+        if (vibrate) buzz([200, 100, 200]);
+        setTimeout(() => setLeft(null), 1500);
+      }
+    }, 1000);
+    return () => clearInterval(id);
+  }, [left == null]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  if (left == null) return null;
+  const mm = Math.floor(left / 60);
+  const ss = String(left % 60).padStart(2, '0');
+  return (
+    <div className={`rest ${left <= 10 ? 'warn' : ''} ${left === 0 ? 'go' : ''}`}>
+      <span>Rest</span>
+      <strong>{left === 0 ? 'Go' : `${mm}:${ss}`}</strong>
+      <button onClick={() => { endAt.current += 15000; setLeft((l) => (l ?? 0) + 15); }}>+15s</button>
+      <button onClick={() => setLeft(null)}>Skip</button>
+    </div>
+  );
+}
