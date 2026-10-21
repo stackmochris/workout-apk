@@ -18,12 +18,12 @@ export default function History({ data }: { data: AppData }) {
       {view === 'sessions' && (sessions.length === 0 ? <p className="muted pad">No sessions yet.</p> : sessions.map((s) => (
         <article key={s.id} className={`card ${s.status === 'skipped' ? 'skipped' : s.type === 'GVT' ? 'gvt-day' : 'complete'}`}>
           <div className="mv-head">
-            <h3>{s.focus} · {s.type}</h3>
+            <h3>{s.focus} · {s.swap ? 'Bodyweight swap' : s.type}</h3>
             <small>{new Date(s.date).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })}</small>
           </div>
           {s.status === 'skipped' ? <p className="muted">Skipped</p> : s.movements.map((m) => (
             <p key={m.movementId} className="hist-line"><span>{m.name}</span>
-              <span className="muted">{s.gvtRepsPerMinute ? '' : m.sets.filter((x) => x.done).map((x) => `${x.weight ?? '–'}×${x.reps ?? '–'}`).join('  ')}</span></p>
+              <span className="muted">{s.gvtRepsPerMinute ? '' : s.swap ? m.sets.map((x) => x.reps ?? 0).join(' + ') : m.sets.filter((x) => x.done).map((x) => `${x.weight ?? '–'}×${x.reps ?? '–'}`).join('  ')}</span></p>
           ))}
           {s.gvtRepsPerMinute && <p className="muted">GVT: {s.gvtRepsPerMinute.reduce((a, b) => a + b, 0)} reps over {s.gvtRepsPerMinute.length} min</p>}
         </article>

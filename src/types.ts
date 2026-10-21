@@ -35,6 +35,8 @@ export interface Session {
   focus: Focus;
   type: SessionType;
   status: 'completed' | 'skipped';
+  /** 100-rep bodyweight swap: counts toward the week and rotation, excluded from strength trends and PRs. */
+  swap?: boolean;
   movements: LoggedMovement[];
   gvtRepsPerMinute?: number[];
   /** Sync metadata (M4): who wrote the record and when. */
@@ -54,5 +56,7 @@ export interface Settings {
   sound: boolean;
   vibrate: boolean;
   summaryThreshold: number;
+  /** Missed-week load penalty (brief §5.14). */
+  penalty: { barbellKg: number; dumbbellCableKg: number; elbowReps: number; stack: boolean };
   targets: { proteinMin: number; proteinMax: number; kcalMin: number; kcalMax: number; waterGlasses: number };
 }

@@ -1,10 +1,12 @@
 import { useMemo, useState } from 'react';
 import { completeSession, currentPlan, preview, skipSession } from '../engine/rotation';
-import { DEFAULT_DAY, FLAG_INFO } from '../data/movements';
+import { DEFAULT_DAY, FLAG_INFO, SWAP_DEFAULTS } from '../data/movements';
+import { penalisedHint, penaltyState } from '../engine/week';
 import { AppData, previousFor, uid } from '../lib/store';
 import { LoggedMovement, Movement, Session } from '../types';
 import RestTimer from '../components/RestTimer';
 import GvtTimer from '../components/GvtTimer';
+import SwapSession from '../components/SwapSession';
 
 type Props = { data: AppData; setData: React.Dispatch<React.SetStateAction<AppData>> };
 
@@ -18,6 +20,12 @@ export default function Today({ data, setData }: Props) {
   const [picker, setPicker] = useState<{ mode: 'add' | 'swap'; index?: number } | null>(null);
   const [rest, setRest] = useState(0);
   const [gvtPicks, setGvtPicks] = useState<string[] | null>(null);
+  const [swapping, setSwapping] = useState(false);
+  const pen = data.settings.penalty;
+  const penalty = useMemo(
+    () => penaltyState(data.sessions, new Date(), data.settings.summaryThreshold, pen.stack),
+    [data.sessions, data.settings.summaryThreshold, pen.stack],
+  );
 
   const draft =
     data.draft && data.draft.focus === plan.focus && data.draft.type === plan.type
@@ -45,7 +53,7 @@ export default function Today({ data, setData }: Props) {
       movements: status === 'completed' ? draft.movements.filter((m) => m.sets.some((s) => s.done) || extra.gvtRepsPerMinute) : [],
       author: 'app', updatedAt: now, ...extra,
     };
-    if (status === 'completed' && !confirm(`Finish ${plan.focus} (${plan.type}) and advance the rotation?`)) return;
+    if (status === 'completed' && !extra.swap && !confirm(`Finish ${plan.focus} (${plan.type}) and advance the rotation?`)) return;
     if (status === 'skipped' && !confirm(`Skip ${plan.focus}? The plan rolls forward to the next focus.`)) return;
     setData((d) => ({
       ...d,
@@ -54,6 +62,7 @@ export default function Today({ data, setData }: Props) {
       draft: null,
     }));
     setGvtPicks(null);
+    setSwapping(false);
   };
 
   const pick = (m: Movement) => {
@@ -79,7 +88,31 @@ export default function Today({ data, setData }: Props) {
         <p className="next">Up next: {next.map((n) => `${n.focus} · ${n.type}`).join('  →  ')}</p>
       </header>
 
-      {plan.type === 'GVT' ? (
+      {penalty.multiplier > 0 && (
+        <div className="banner penalty" role="status">
+          <strong>Load penalty this week{penalty.multiplier > 1 ? ` ×${penalty.multiplier}` : ''}</strong>
+          <span>
+            Last week: {penalty.lastWeekCount} of {data.settings.summaryThreshold} sessions. Working-load hints are up
+            {' '}+{pen.barbellKg * penalty.multiplier} kg barbell, +{pen.dumbbellCableKg * penalty.multiplier} kg dumbbell and cable,
+            {' '}+{pen.elbowReps * penalty.multiplier} reps on elbow-flagged movements.
+          </span>
+        </div>
+      )}
+
+      {swapping ? (
+        <SwapSession
+          focus={plan.focus}
+          option={SWAP_DEFAULTS[plan.focus]}
+          onCancel={() => setSwapping(false)}
+          onFinish={(name, reps) => {
+            if (!confirm(`Log ${name} as today's ${plan.focus} session and advance the rotation?`)) return;
+            finish('completed', {
+              swap: true,
+              movements: [{ movementId: `swap-${plan.focus.toLowerCase()}`, name, sets: reps.map((r) => ({ reps: r, weight: null, done: true })) }],
+            });
+          }}
+        />
+      ) : plan.type === 'GVT' ? (
         <div className="card gvt-card">
           {!gvtPicks ? (
             <>
@@ -129,7 +162,7 @@ export default function Today({ data, setData }: Props) {
                 <div className="sets">
                   <div className="sets-h"><span>Set</span><span>Reps</span><span>Weight</span><span /></div>
                   {lm.sets.map((s, si) => {
-                    const p = prev?.sets[si];
+                    const p = prev?.sets[si] ? penalisedHint(mv, prev.sets[si], penalty.multiplier, pen) : undefined;
                     return (
                       <div key={si} className={`set ${s.done ? 'done' : ''}`}>
                         <span>{si + 1}</span>
@@ -162,7 +195,7 @@ export default function Today({ data, setData }: Props) {
       )}
       <div className="row center">
         <button className="ghost" onClick={() => finish('skipped')}>Skip {plan.focus} → next focus</button>
-        <button className="ghost" disabled title="Coming in M2">Can't get to the gym? (M2)</button>
+        {!swapping && <button className="ghost" onClick={() => setSwapping(true)}>Can't get to the gym?</button>}
       </div>
 
       <RestTimer seconds={data.settings.restSeconds} sound={data.settings.sound} vibrate={data.settings.vibrate} trigger={rest} />

@@ -20,6 +20,14 @@ export default function SettingsScreen({ data, setData }: Props) {
         <label className="toggle">Vibration<input type="checkbox" checked={s.vibrate} onChange={(e) => set({ vibrate: e.target.checked })} /></label>
       </div>
       <div className="card form">
+        <h3>Missed-week penalty</h3>
+        <p className="muted">Applies when last week had fewer than {s.summaryThreshold} completed sessions (swaps count). Amounts not final yet.</p>
+        <label>Barbell (+kg)<input inputMode="decimal" value={s.penalty.barbellKg} onChange={(e) => set({ penalty: { ...s.penalty, barbellKg: num(e.target.value, 2.5) } })} /></label>
+        <label>Dumbbell / cable (+kg)<input inputMode="decimal" value={s.penalty.dumbbellCableKg} onChange={(e) => set({ penalty: { ...s.penalty, dumbbellCableKg: num(e.target.value, 1) } })} /></label>
+        <label>Elbow-flagged (+reps)<input inputMode="numeric" value={s.penalty.elbowReps} onChange={(e) => set({ penalty: { ...s.penalty, elbowReps: num(e.target.value, 2) } })} /></label>
+        <label className="toggle">Stack across consecutive missed weeks<input type="checkbox" checked={s.penalty.stack} onChange={(e) => set({ penalty: { ...s.penalty, stack: e.target.checked } })} /></label>
+      </div>
+      <div className="card form">
         <h3>Rotation</h3>
         <p className="muted">Counters: {Object.entries(data.rotation.counters).map(([f, c]) => `${f} ${c + 1}/3`).join(' · ')}</p>
       </div>

@@ -1,18 +1,8 @@
 import { AppData } from '../lib/store';
-import { Session } from '../types';
+import { weekCount } from '../engine/week';
 
-/** Monday 00:00 local of the current week. */
-export function weekStart(d = new Date()) {
-  const x = new Date(d);
-  x.setHours(0, 0, 0, 0);
-  x.setDate(x.getDate() - ((x.getDay() + 6) % 7));
-  return x;
-}
+export { weekCount, weekStart } from '../engine/week';
 
-export function weekCount(sessions: Session[], now = new Date()) {
-  const start = weekStart(now).getTime();
-  return sessions.filter((s) => s.status === 'completed' && new Date(s.date).getTime() >= start).length;
-}
 
 export default function Summary({ data }: { data: AppData }) {
   const n = weekCount(data.sessions);

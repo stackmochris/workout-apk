@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { initialRotation } from '../engine/rotation';
+import { DEFAULT_PENALTY } from '../engine/week';
 import { SEED_MOVEMENTS } from '../data/movements';
 import { LoggedMovement, Movement, RotationState, Session, Settings } from '../types';
 
@@ -21,6 +22,7 @@ export const DEFAULT_SETTINGS: Settings = {
   sound: true,
   vibrate: true,
   summaryThreshold: 4,
+  penalty: DEFAULT_PENALTY,
   targets: { proteinMin: 160, proteinMax: 180, kcalMin: 1950, kcalMax: 2200, waterGlasses: 8 },
 };
 
@@ -33,7 +35,7 @@ export function load(): AppData {
     const raw = localStorage.getItem(KEY);
     if (!raw) return freshData();
     const d = JSON.parse(raw);
-    return { ...freshData(), ...d, settings: { ...DEFAULT_SETTINGS, ...d.settings } };
+    return { ...freshData(), ...d, settings: { ...DEFAULT_SETTINGS, ...d.settings, penalty: { ...DEFAULT_PENALTY, ...d.settings?.penalty } } };
   } catch {
     return freshData();
   }
@@ -58,11 +60,11 @@ export function exportJson(data: AppData) {
 
 export const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
 
-/** Most recent logged sets for a movement, for "previous" hints. */
+/** Most recent logged sets for a movement, for "previous" hints. Swap sessions are excluded. */
 export function previousFor(sessions: Session[], movementId: string): LoggedMovement | undefined {
   for (let i = sessions.length - 1; i >= 0; i--) {
     const s = sessions[i];
-    if (s.status !== 'completed') continue;
+    if (s.status !== 'completed' || s.swap) continue;
     const m = s.movements.find((x) => x.movementId === movementId);
     if (m && m.sets.some((x) => x.done)) return m;
   }
