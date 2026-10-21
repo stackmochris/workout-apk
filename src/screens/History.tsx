@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { AppData } from '../lib/store';
 import { Session } from '../types';
-import { foldHistory, Group, insights } from '../engine/history';
+import { foldHistory, Group } from '../engine/history';
+import { buildReport } from '../engine/report';
 import { blockLabel, blocks } from '../engine/gvt';
 
 function SessionCard({ s }: { s: Session }) {
@@ -42,21 +43,39 @@ function Fold({ g, data, onInsights }: { g: Exclude<Group, { kind: 'day' }>; dat
   );
 }
 
+const sign = (n: number, d = 1) => `${n > 0 ? '+' : ''}${Number(n.toFixed(d))}`;
+
 function InsightsModal({ g, data, onClose }: { g: Exclude<Group, { kind: 'day' }>; data: AppData; onClose: () => void }) {
-  const weeks = Math.round((g.end.getTime() - g.start.getTime()) / (7 * 864e5));
-  const i = insights(data.sessions, g.start, g.end, weeks, data.settings.summaryThreshold);
+  const r = buildReport(data.sessions, data.movements, data.body, g.start, g.end, { perWeek: data.settings.summaryThreshold, muscleTarget: data.settings.muscleTarget });
+  const off = r.muscles.filter((m) => m.status !== 'on' && (m.perWeek > 0 || r.completed > 0));
+  const kinds = r.setKinds;
   return (
     <div className="sheet" onClick={onClose}>
-      <div className="sheet-body" role="dialog" aria-label="Insights" onClick={(e) => e.stopPropagation()}>
-        <h3>{g.label} insights</h3>
-        <p className="hist-line"><span>Sessions</span><b>{i.completed} of {i.planned} planned</b></p>
-        <p className="hist-line"><span>Total volume</span><b>{i.volumeKg.toLocaleString()} kg{i.prevVolumeKg != null ? ` (prev ${i.prevVolumeKg.toLocaleString()} kg)` : ''}</b></p>
-        <h4>New PRs</h4>
-        {i.prs.length ? i.prs.map((p) => <p key={p.name + p.kind} className="hist-line"><span>{p.name}</span><span>{p.kind === 'kg' ? 'Heaviest' : 'Est. 1RM'} {p.value} kg <small>(was {p.previous})</small></span></p>)
-          : <p className="muted">None this period.</p>}
-        <h4>Weight drops vs previous {g.kind}</h4>
-        {i.drops.length ? i.drops.map((d) => <p key={d.name} className="hist-line"><span>{d.name}</span><span>{d.kg} kg <small>(was {d.previous})</small></span></p>)
-          : <p className="muted">None.</p>}
+      <div className="sheet-body report" role="dialog" aria-label="Insights" onClick={(e) => e.stopPropagation()}>
+        <h3>{g.label} report</h3>
+        <p className="hist-line"><span>Sessions</span><b>{r.completed} of {r.planned} planned{r.missed ? ` · ${r.missed} missed` : ''}{r.skipped ? ` · ${r.skipped} skipped` : ''}</b></p>
+        <p className="hist-line"><span>Total volume</span><b>{r.volumeKg.toLocaleString()} kg{r.volumeChangePct != null ? ` (${sign(r.volumeChangePct)}% vs previous ${g.kind})` : ''}</b></p>
+        <p className="hist-line"><span>Sets by type</span><span>{kinds.working} working · {kinds.warmup} warm-up · {kinds.drop} drop · {kinds.failure} to failure</span></p>
+
+        <h4>Est. 1RM by lift</h4>
+        {r.lifts.length ? r.lifts.map((l) => (
+          <p key={l.id} className="hist-line"><span>{l.pr ? '🏆 ' : ''}{l.name}</span>
+            <span>{l.e1rm} kg {l.change != null ? <small className={l.change > 0 ? 'up' : l.change < 0 ? 'down' : ''}>({sign(l.change)} vs previous)</small> : <small>(new)</small>}</span></p>
+        )) : <p className="muted">No weighted sets this {g.kind}.</p>}
+
+        <h4>Sets per muscle per week (target {data.settings.muscleTarget})</h4>
+        {off.length ? off.map((m) => (
+          <p key={m.muscle} className="hist-line"><span>{m.label}</span><span className={m.status === 'under' ? 'down' : 'up'}>{m.perWeek} · {m.status === 'under' ? 'under' : 'over'}</span></p>
+        )) : <p className="muted">Every muscle on target.</p>}
+
+        <h4>Body</h4>
+        {r.body.weightAvg != null || r.body.bodyFatChange != null || r.body.waistChange != null ? (
+          <>
+            {r.body.weightAvg != null && <p className="hist-line"><span>Evening weight avg</span><span>{r.body.weightAvg} kg{r.body.weightChange != null ? ` (${sign(r.body.weightChange, 2)} kg)` : ''}</span></p>}
+            {r.body.bodyFatChange != null && <p className="hist-line"><span>Body fat</span><span>{sign(r.body.bodyFatChange)}%</span></p>}
+            {r.body.waistChange != null && <p className="hist-line"><span>Waist</span><span>{sign(r.body.waistChange)} cm</span></p>}
+          </>
+        ) : <p className="muted">No late-evening weigh-ins this {g.kind}.</p>}
         <button className="primary wide" onClick={onClose}>Close</button>
       </div>
     </div>

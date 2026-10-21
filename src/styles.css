@@ -162,3 +162,4 @@ h4 { margin: 14px 0 4px; font-size: 14px; }
 label.file { text-align: center; position: relative; }
 label.file input { position: absolute; inset: 0; opacity: 0; width: 100%; max-width: none; cursor: pointer; }
 .form label.file { justify-content: center; }
+.report .up { color: var(--accent); } .report .down { color: var(--danger); }
