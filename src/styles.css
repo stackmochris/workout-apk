@@ -137,3 +137,25 @@ h4 { margin: 14px 0 4px; font-size: 14px; }
 .ss-tag { display: inline-block; font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: #3b82c4; margin-bottom: 4px; }
 .recovery { margin: 8px 0 0; font-size: 13px; color: #ffd8a8; }
 .primary.wide { min-height: 52px; }
+.chart { width: 100%; height: auto; display: block; margin: 6px 0; }
+.chart .grid { stroke: var(--border); stroke-dasharray: 3 3; }
+.chart .axis { font-size: 9px; fill: var(--muted); }
+.chart .axis.end { text-anchor: end; }
+.chart .line { fill: none; stroke: var(--accent); stroke-width: 2.5; stroke-linejoin: round; stroke-linecap: round; }
+.chart .raw { fill: none; stroke: var(--border); stroke-width: 1.5; }
+.chart .dot { fill: var(--active); }
+.bodymap { display: flex; justify-content: center; gap: 24px; }
+.bodymap figure { margin: 0; text-align: center; }
+.bodymap figcaption { font-size: 12px; color: var(--muted); }
+.body { width: 120px; height: 240px; }
+.body .outline { fill: var(--surface2); stroke: var(--border); stroke-width: 1; }
+.body path:not(.outline) { transition: fill .4s; }
+.bars { display: grid; gap: 6px; margin-top: 8px; }
+.bar { display: grid; grid-template-columns: 90px 1fr 34px; gap: 8px; align-items: center; font-size: 13px; }
+.bar b { text-align: right; font-variant-numeric: tabular-nums; }
+.track { height: 10px; background: var(--surface2); border: 1px solid var(--border); border-radius: 99px; overflow: hidden; }
+.track i { display: block; height: 100%; background: color-mix(in srgb, var(--accent) 55%, transparent); }
+.track i.hit { background: var(--accent); }
+.body-form { display: grid; grid-template-columns: 1fr 1fr 1fr auto; gap: 6px; margin: 8px 0; }
+.body-form input { padding: 10px 6px; }
+.tabs button { max-width: 112px; }
