@@ -87,6 +87,11 @@ export interface Settings {
   notifications: boolean;
   targets: { proteinMin: number; proteinMax: number; kcalMin: number; kcalMax: number; waterGlasses: number };
   deload?: boolean;
+  frequency: {
+    enabled: boolean;
+    threshold: number;
+    watch: string[];
+  };
 }
 
 export interface BodyEntry {
