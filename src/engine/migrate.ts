@@ -33,6 +33,7 @@ export const DEFAULT_SETTINGS: Settings = {
     threshold: 3,
     watch: ['Chest', 'Shoulder', 'Back', 'Arm', 'Leg', 'push', 'pull'],
   },
+  theme: 'green',
 };
 
 export function freshData(): AppData {
@@ -59,6 +60,7 @@ export function migrate(raw: unknown): AppData {
       gvt: { ...DEFAULT_SETTINGS.gvt, ...d.settings?.gvt },
       targets: { ...DEFAULT_SETTINGS.targets, ...d.settings?.targets },
       frequency: { ...DEFAULT_SETTINGS.frequency, ...d.settings?.frequency },
+      theme: d.settings?.theme ?? 'green',
     },
   };
 }
