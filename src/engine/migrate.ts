@@ -10,7 +10,6 @@ export interface AppData {
   movements: Movement[];
   rotation: RotationState;
   sessions: Session[];
-  /** In-progress session for today, keyed by plan so a reload keeps the inputs. */
   draft: { focus: string; type: string; movements: LoggedMovement[]; gvtRepsPerMinute?: number[] } | null;
   settings: Settings;
   body: BodyEntry[];
@@ -29,17 +28,17 @@ export const DEFAULT_SETTINGS: Settings = {
   supersetRest: 15,
   notifications: false,
   targets: { proteinMin: 160, proteinMax: 180, kcalMin: 1950, kcalMax: 2200, waterGlasses: 8 },
+  frequency: {
+    enabled: true,
+    threshold: 3,
+    watch: ['Chest', 'Shoulder', 'Back', 'Arm', 'Leg', 'push', 'pull'],
+  },
 };
 
 export function freshData(): AppData {
   return { version: 2, movements: SEED_MOVEMENTS, rotation: initialRotation(), sessions: [], draft: null, settings: DEFAULT_SETTINGS, body: [] };
 }
 
-/**
- * Bring any stored or imported shape up to the current version without dropping fields.
- * v1 → v2: adds body stats and new settings; sets without a kind stay working sets.
- * Movements added to the seed library later are appended so existing edits are kept.
- */
 export function migrate(raw: unknown): AppData {
   const fresh = freshData();
   if (!raw || typeof raw !== 'object') return fresh;
@@ -59,6 +58,7 @@ export function migrate(raw: unknown): AppData {
       penalty: { ...DEFAULT_PENALTY, ...d.settings?.penalty },
       gvt: { ...DEFAULT_SETTINGS.gvt, ...d.settings?.gvt },
       targets: { ...DEFAULT_SETTINGS.targets, ...d.settings?.targets },
+      frequency: { ...DEFAULT_SETTINGS.frequency, ...d.settings?.frequency },
     },
   };
 }
