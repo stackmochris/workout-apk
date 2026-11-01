@@ -3,7 +3,7 @@ import { completeSession, currentPlan, preview, skipSession } from '../engine/ro
 import { DEFAULT_DAY, FLAG_INFO, SWAP_DEFAULTS } from '../data/movements';
 import { penalisedHint, penaltyState } from '../engine/week';
 import { AppData, previousFor, uid } from '../lib/store';
-import { LoggedMovement, Movement, Session, SetKind } from '../types';
+import { LoggedMovement, Movement, Session, SetKind, UserPrefs } from '../types';
 import RestTimer, { RestCue } from '../components/RestTimer';
 import SetRow from '../components/SetRow';
 import { suggestNext } from '../engine/progression';
@@ -18,13 +18,13 @@ import { editSet } from '../engine/sets';
 import { blockLabel, blocks, doneSets, logBlock } from '../engine/gvt';
 import { FOCI, Focus, SessionType } from '../types';
 
-type Props = { data: AppData; setData: React.Dispatch<React.SetStateAction<AppData>> };
+type Props = { data: AppData; setData: React.Dispatch<React.SetStateAction<AppData>>; prefs?: UserPrefs };
 
 function blank(m: Movement): LoggedMovement {
   return { movementId: m.id, name: m.name, sets: Array.from({ length: m.sets || 3 }, () => ({ reps: null, weight: null, done: false })) };
 }
 
-export default function Today({ data, setData }: Props) {
+export default function Today({ data, setData, prefs }: Props) {
   const planned = currentPlan(data.rotation);
   const [browse, setBrowse] = useState<{ focus: Focus; type: SessionType } | null>(null);
   const plan = browse ? { ...planned, ...browse } : planned;
@@ -66,7 +66,6 @@ export default function Today({ data, setData }: Props) {
     }
   };
 
-  /** Rest after a ticked set. In a superset, a short hop to the partner card, then full rest after the round. */
   const cueRest = (movements: LoggedMovement[], mi: number, si: number) => {
     const full = data.settings.restSeconds;
     const lm = movements[mi];
@@ -76,8 +75,8 @@ export default function Today({ data, setData }: Props) {
       const partner = group[(pos + 1) % group.length].m;
       const partnerPending = partner.sets[si] && !partner.sets[si].done;
       setRest((r) => partnerPending
-        ? { n: r.n + 1, seconds: data.settings.supersetRest, label: `→ ${short(partner.name)}` }
-        : { n: r.n + 1, seconds: full, label: `Rest → ${short(group[0].m.name)}` });
+        ? { n: r.n + 1, seconds: data.settings.supersetRest, label: `\u2192 ${short(partner.name)}` }
+        : { n: r.n + 1, seconds: full, label: `Rest \u2192 ${short(group[0].m.name)}` });
       return;
     }
     setRest((r) => ({ n: r.n + 1, seconds: full, label: 'Rest' }));
@@ -158,12 +157,12 @@ export default function Today({ data, setData }: Props) {
         </div>
         {!onPlan && <p className="muted small">Browsing. Logging this won't move the rotation.</p>}
         {tired.length > 0 && <p className="recovery">Probably still recovering: {tired.map(label).join(', ')}. Go lighter on those or pick another focus.</p>}
-        <p className="next">Up next: {next.map((n) => `${n.focus} · ${n.type}`).join('  →  ')}</p>
+        <p className="next">Up next: {next.map((n) => `${n.focus} \u00b7 ${n.type}`).join('  \u2192  ')}</p>
       </header>
 
       {penalty.multiplier > 0 && (
         <div className="banner penalty" role="status">
-          <strong>Load penalty this week{penalty.multiplier > 1 ? ` ×${penalty.multiplier}` : ''}</strong>
+          <strong>Load penalty this week{penalty.multiplier > 1 ? ` \u00d7${penalty.multiplier}` : ''}</strong>
           <span>
             Last week: {penalty.lastWeekCount} of {data.settings.summaryThreshold} sessions. Working-load hints are up
             {' '}+{pen.barbellKg * penalty.multiplier} kg barbell, +{pen.dumbbellCableKg * penalty.multiplier} kg dumbbell and cable,
@@ -209,7 +208,7 @@ export default function Today({ data, setData }: Props) {
           ) : gvtRun ? (
             <>
               <h3>{draft.movements[gvtRun.index].name}</h3>
-              <p className="muted">{gvtRun.weight ?? '–'} kg{doneSets(draft.movements[gvtRun.index]) ? ` · ${blocks(draft.movements[gvtRun.index].sets).map(blockLabel).join(', ')} logged` : ''}</p>
+              <p className="muted">{gvtRun.weight ?? '\u2013'} kg{doneSets(draft.movements[gvtRun.index]) ? ` \u00b7 ${blocks(draft.movements[gvtRun.index].sets).map(blockLabel).join(', ')} logged` : ''}</p>
               <GvtTimer key={`${gvtRun.index}-${doneSets(draft.movements[gvtRun.index])}`} {...data.settings.gvt} sound={data.settings.sound} vibrate={data.settings.vibrate}
                 startAt={doneSets(draft.movements[gvtRun.index])} weight={gvtRun.weight} autoStart
                 onAdjust={(reps) => { logGvt(gvtRun.index, gvtRun.weight, reps); setGvtKg((k) => ({ ...k, [gvtRun.index]: null })); setGvtRun(null); }}
@@ -225,7 +224,7 @@ export default function Today({ data, setData }: Props) {
                 return (
                   <article key={lm.movementId} className={`card mv ${done >= total ? 'complete' : done ? 'active' : ''}`}>
                     <h3>{lm.name}</h3>
-                    {done > 0 && <p className="muted">{blocks(lm.sets).map(blockLabel).join(' · ')}</p>}
+                    {done > 0 && <p className="muted">{blocks(lm.sets).map(blockLabel).join(' \u00b7 ')}</p>}
                     {done < total ? (
                       <div className="gvt-start">
                         <NumInput kind="kg" label={`${lm.name} kg`} value={gvtKg[mi] ?? null} placeholder={prevKg != null ? String(prevKg) : 'kg'}
@@ -263,18 +262,18 @@ export default function Today({ data, setData }: Props) {
                 <div className="mv-head">
                   <div>
                     <h3>{lm.name}</h3>
-                    <small>{mv?.target}{mv?.notes ? ` · ${mv.notes}` : ''}</small>
+                    <small>{mv?.target}{mv?.notes ? ` \u00b7 ${mv.notes}` : ''}</small>
                   </div>
                   <button className="ghost" onClick={() => setPicker({ mode: 'swap', index: mi })}>Swap</button>
                 </div>
                 {sug.reason !== 'none' && (
                   <p className="suggest">
-                    <b>Next: {sugP.weight != null ? `${sugP.weight} kg × ` : ''}{sugP.reps}</b>
+                    <b>Next: {sugP.weight != null ? `${sugP.weight} kg \u00d7 ` : ''}{sugP.reps}</b>
                     <span>{sug.reason === 'add-weight' ? 'Top of range hit. Add weight' : sug.reason === 'add-reps' ? 'Add a rep' : 'Repeat'}{sugP.addedKg || sugP.addedReps ? ' (incl. penalty)' : ''}</span>
                     {mv?.equipment === 'barbell' && sugP.weight != null && <span className="plates">{plateLabel(plateLoad(sugP.weight, data.settings.barKg, data.settings.plates))}</span>}
                   </p>
                 )}
-                {flagged && mv!.flags.map((f) => <p key={f} className="flag">⚠ {FLAG_INFO[f]?.reminder ?? f}</p>)}
+                {flagged && mv!.flags.map((f) => <p key={f} className="flag">\u26a0 {FLAG_INFO[f]?.reminder ?? f}</p>)}
                 <div className="sets">
                   <div className="sets-h"><span>Set</span><span>kg</span><span>Reps</span><span /></div>
                   {lm.sets.map((s, si) => {
@@ -290,11 +289,11 @@ export default function Today({ data, setData }: Props) {
                   })}
                 </div>
                 <div className="mv-foot">
-                  <span className="muted">{prev ? `Last: ${prev.sets.filter((x) => x.done).map((x) => `${x.weight ?? '–'}×${x.reps ?? '–'}`).join(', ')}` : 'No previous session'}</span>
+                  <span className="muted">{prev ? `Last: ${prev.sets.filter((x) => x.done).map((x) => `${x.weight ?? '\u2013'}\u00d7${x.reps ?? '\u2013'}`).join(', ')}` : 'No previous session'}</span>
                   <span>
                     <button className="ghost" onClick={() => saveDraft(draft.movements.map((m, i) => i === mi ? { ...m, sets: [...m.sets, { reps: null, weight: null, done: false }] } : m))}>+ Set</button>
                     {(lm.superset || mi + 1 < draft.movements.length) && (
-                      <button className="ghost" onClick={() => toggleSuperset(mi)}>{lm.superset ? 'Unlink' : 'Superset ↓'}</button>
+                      <button className="ghost" onClick={() => toggleSuperset(mi)}>{lm.superset ? 'Unlink' : 'Superset \u2193'}</button>
                     )}
                     <button className="ghost" onClick={() => saveDraft(draft.movements.filter((_, i) => i !== mi))}>Remove</button>
                   </span>
@@ -307,7 +306,7 @@ export default function Today({ data, setData }: Props) {
         </>
       )}
       <div className="row center">
-        {onPlan && <button className="ghost" onClick={() => finish('skipped')}>Skip {plan.focus} → next focus</button>}
+        {onPlan && <button className="ghost" onClick={() => finish('skipped')}>Skip {plan.focus} \u2192 next focus</button>}
         {!swapping && <button className="ghost" onClick={() => setSwapping(true)}>Can't get to the gym?</button>}
       </div>
 
@@ -333,16 +332,16 @@ function Picker({ movements, focus, onPick }: { movements: Movement[]; focus: st
     <>
       <div className="row">
         <input className="search" placeholder="Search" value={q} onChange={(e) => setQ(e.target.value)} />
-        <button className={`chip ${!all ? 'on' : ''}`} onClick={() => setAll(false)}>{focus}</button>
-        <button className={`chip ${all ? 'on' : ''}`} onClick={() => setAll(true)}>All</button>
+        <button className={`chip ${all ? 'on' : ''}`} onClick={() => setAll((v) => !v)}>{all ? 'All' : focus}</button>
       </div>
       <ul className="pick">
-        {list.map((m) => (
-          <li key={m.id}><button onClick={() => onPick(m)}>{m.name}<small>{m.focus} · {m.target}{m.flags.length ? ' · ⚠' : ''}</small></button></li>
-        ))}
+        {list.map((m) => <li key={m.id}><button onClick={() => onPick(m)}>{m.name}<small>{m.focus} \u00b7 {m.target}</small></button></li>)}
+        {!list.length && <li className="muted pad">Nothing matches.</li>}
       </ul>
     </>
   );
 }
 
-const short = (name: string) => name.split(/[(/]/)[0].trim();
+function short(name: string) {
+  return name.split('(')[0].trim().slice(0, 18);
+}
