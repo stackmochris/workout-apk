@@ -4,8 +4,20 @@ import { AppData, exportCsv, exportJson, freshData } from '../lib/store';
 import { listSnapshots, parseBackup, readSnapshot } from '../lib/backup';
 import { notificationsSupported, requestNotifications } from '../lib/alerts';
 import { plateLabel, plateLoad } from '../engine/plates';
+import { Theme } from '../types';
 
 type Props = { data: AppData; setData: React.Dispatch<React.SetStateAction<AppData>> };
+
+const THEMES: { id: Theme; label: string }[] = [
+  { id: 'green', label: 'Green spectrum' },
+  { id: 'red', label: 'Red spectrum' },
+  { id: 'blue', label: 'Blue spectrum' },
+  { id: 'gold', label: 'Gold spectrum' },
+  { id: 'templar', label: 'Red Knight\'s Templar Cross on White' },
+  { id: 'union-jack', label: 'Union Jack' },
+  { id: 'confederate', label: 'Confederate Flag' },
+  { id: 'pride', label: 'Pride Flag' },
+];
 
 export default function SettingsScreen({ data, setData }: Props) {
   const s = data.settings;
@@ -36,6 +48,17 @@ export default function SettingsScreen({ data, setData }: Props) {
   return (
     <section>
       <header className="hero"><small>Preferences</small><h1>Settings</h1></header>
+      <div className="card form">
+        <h3>Visual customization</h3>
+        <p className="muted small">Hero background packs</p>
+        <div className="chips">
+          {THEMES.map((t) => (
+            <button key={t.id} className={`chip ${s.theme === t.id ? 'on' : ''}`} onClick={() => set({ theme: t.id })}>
+              {t.label}
+            </button>
+          ))}
+        </div>
+      </div>
       <div className="card form">
         <h3>Timers</h3>
         <label>Rest (seconds)<input inputMode="numeric" value={s.restSeconds} onChange={(e) => set({ restSeconds: num(e.target.value, 90) })} /></label>
