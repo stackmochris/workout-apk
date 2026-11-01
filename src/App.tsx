@@ -36,16 +36,18 @@ export default function App() {
     setPrefs(p);
   };
 
+  const themeClass = `theme-${data.settings.theme || 'green'}`;
+
   if (!prefs?.onboarded) {
     return (
-      <div className="app">
+      <div className={`app ${themeClass}`}>
         <Onboarding onComplete={completeOnboarding} />
       </div>
     );
   }
 
   return (
-    <div className="app">
+    <div className={`app ${themeClass}`}>
       <UpdateBanner />
       <main>
         {tab === 'today' && <Today data={data} setData={setData} prefs={prefs} />}
