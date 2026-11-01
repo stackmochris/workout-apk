@@ -1,6 +1,7 @@
 export type Focus = 'Chest' | 'Shoulder' | 'Back' | 'Arm' | 'Leg';
 export const FOCI: Focus[] = ['Chest', 'Shoulder', 'Back', 'Arm', 'Leg'];
 export type SessionType = 'Normal' | 'GVT';
+export type ActivityType = 'gym' | 'run' | 'walk' | 'hike' | 'calisthenics' | 'other';
 
 export interface Movement {
   id: string;
@@ -46,6 +47,12 @@ export interface Session {
   swap?: boolean;
   movements: LoggedMovement[];
   gvtRepsPerMinute?: number[];
+  /** Non-gym activity support */
+  activity?: ActivityType;
+  durationMin?: number;
+  distanceKm?: number;
+  effort?: number; // 1-10
+  notes?: string;
   /** Sync metadata (M4): who wrote the record and when. */
   author: 'app' | 'assistant';
   updatedAt: string;
@@ -74,6 +81,8 @@ export interface Settings {
   supersetRest: number;
   notifications: boolean;
   targets: { proteinMin: number; proteinMax: number; kcalMin: number; kcalMax: number; waterGlasses: number };
+  /** Manual deload flag for the current week */
+  deload?: boolean;
 }
 
 export interface BodyEntry {
