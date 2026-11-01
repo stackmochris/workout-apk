@@ -26,6 +26,13 @@ export default function SettingsScreen({ data, setData }: Props) {
     try { restore(parseBackup(await f.text()), f.name); } catch { setMsg('That file is not a workout backup.'); }
   };
 
+  const toggleWatch = (item: string) => {
+    const watch = s.frequency.watch.includes(item)
+      ? s.frequency.watch.filter((x) => x !== item)
+      : [...s.frequency.watch, item];
+    set({ frequency: { ...s.frequency, watch } });
+  };
+
   return (
     <section>
       <header className="hero"><small>Preferences</small><h1>Settings</h1></header>
@@ -45,6 +52,17 @@ export default function SettingsScreen({ data, setData }: Props) {
           }} /></label>
         )}
         <label className="toggle">Vibration<input type="checkbox" checked={s.vibrate} onChange={(e) => set({ vibrate: e.target.checked })} /></label>
+      </div>
+      <div className="card form">
+        <h3>Frequency / intensity hints</h3>
+        <label className="toggle">Enable hints<input type="checkbox" checked={s.frequency.enabled} onChange={(e) => set({ frequency: { ...s.frequency, enabled: e.target.checked } })} /></label>
+        <label>Warn after N hits this week<input inputMode="numeric" value={s.frequency.threshold} onChange={(e) => set({ frequency: { ...s.frequency, threshold: num(e.target.value, 3) } })} /></label>
+        <p className="muted small">Watch groups</p>
+        <div className="chips">
+          {['Chest', 'Shoulder', 'Back', 'Arm', 'Leg', 'push', 'pull'].map((g) => (
+            <button key={g} className={`chip ${s.frequency.watch.includes(g) ? 'on' : ''}`} onClick={() => toggleWatch(g)}>{g}</button>
+          ))}
+        </div>
       </div>
       <div className="card form">
         <h3>Missed-week penalty</h3>
@@ -77,7 +95,7 @@ export default function SettingsScreen({ data, setData }: Props) {
         <label className="ghost wide file">Restore from JSON file<input type="file" accept="application/json,.json" onChange={(e) => { void importFile(e.target.files?.[0]); e.target.value = ''; }} /></label>
         {msg && <p className="muted small">{msg}</p>}
         <h4>Automatic backups</h4>
-        <p className="muted small">A copy is saved on this device once a day, last {7} days kept.</p>
+        <p className="muted small">A copy is saved on this device once a day, last 7 days kept.</p>
         {snaps.length ? snaps.map((sn) => (
           <p key={sn.key} className="hist-line">
             <span>{sn.day} · {sn.sessions} sessions</span>
