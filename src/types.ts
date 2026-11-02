@@ -4,7 +4,7 @@ export type SessionType = 'Normal' | 'GVT';
 export type ActivityType = 'gym' | 'run' | 'walk' | 'hike' | 'calisthenics' | 'other';
 
 export type SplitType = 'per-muscle' | 'push-pull-legs' | 'upper-lower' | 'mixed';
-export type Theme = 'green' | 'red' | 'blue' | 'gold' | 'templar' | 'union-jack' | 'confederate' | 'pride';
+export type Theme = 'green' | 'red' | 'blue' | 'gold' | 'templar' | 'jerusalem' | 'union-jack' | 'confederate' | 'pride';
 
 export interface DayTemplate {
   id: string;
