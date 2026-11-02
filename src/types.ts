@@ -63,6 +63,8 @@ export interface LoggedMovement {
   name: string;
   sets: SetEntry[];
   superset?: string;
+  /** Free-text notes for this movement in this session. */
+  notes?: string;
 }
 
 export interface Session {
