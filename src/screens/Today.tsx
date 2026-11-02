@@ -190,7 +190,7 @@ export default function Today({ data, setData, prefs }: Props) {
     <section>
       <header className={`hero ${plan.type === 'GVT' ? 'gvt-day' : ''}`}>
         <small>{onPlan ? 'Today' : 'Browsing'}</small>
-        <h1>{plan.focus}</h1>
+        <h1>{plan.focus === 'NoGym' ? 'No Gym' : plan.focus}</h1>
         <div className="pills">
           <span className={`pill ${plan.type}`}>{plan.type}</span>
           <span className="pill dim">Cycle {plan.cycleStep}/3</span>
