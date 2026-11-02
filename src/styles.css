@@ -17,7 +17,7 @@ h1 { margin: 2px 0 8px; font-size: 32px; letter-spacing: -.02em; }
 h3 { margin: 0 0 4px; font-size: 16px; }
 small, .muted { color: var(--muted); }
 .pad { padding: 16px; }
-.hero { padding: 14px 16px 16px; margin: 0 0 12px; border-radius: 18px; color: #fff; background: radial-gradient(120% 140% at 100% 0%, #17604a 0%, var(--hero) 58%); position: relative; overflow: hidden; }
+.hero { padding: 14px 16px 16px; margin: 0 0 12px; border-radius: 18px; color: #fff; background: radial-gradient(120% 140% at 100% 0%, #17604a 0%, var(--hero) 58%); position: relative; overflow: hidden; border: 2px solid transparent; }
 .hero small, .hero .next, .hero .muted { color: var(--hero-meta); }
 .hero .pill { background: #ffffff14; border-color: #1f5a45; color: #fff; }
 .hero .pill.Normal { color: var(--mint); } .hero .pill.GVT { color: #ffb199; }
@@ -164,48 +164,76 @@ label.file input { position: absolute; inset: 0; opacity: 0; width: 100%; max-wi
 .form label.file { justify-content: center; }
 .report .up { color: var(--accent); } .report .down { color: var(--danger); }
 
-/* Theme packs — phased multi-stop gradients + matching text */
+/* Theme packs — phased gradients + inverse borders + readable controls */
 .hero::after {
   content: '';
   position: absolute; left: 0; right: 0; bottom: 0; height: 28px;
-  background: linear-gradient(180deg, transparent, rgba(0,0,0,.18));
+  background: linear-gradient(180deg, transparent, rgba(0,0,0,.12));
   pointer-events: none;
 }
 .theme-green .hero {
   background: radial-gradient(140% 180% at 100% -10%, #5eead4 0%, #14b8a6 28%, #0f766e 55%, #0f3d2e 85%);
+  border-color: #042f2e;
   --mint: #ccfbf1; --hero-meta: #99f6e4;
 }
 .theme-green .hero h1, .theme-green .hero .pill.Normal { color: #ccfbf1; }
 .theme-red .hero {
   background: radial-gradient(140% 180% at 100% -10%, #fca5a5 0%, #ef4444 28%, #b91c1c 55%, #7f1d1d 85%);
+  border-color: #450a0a;
   --mint: #fee2e2; --hero-meta: #fecaca;
 }
 .theme-red .hero h1, .theme-red .hero .pill.Normal { color: #fee2e2; }
 .theme-blue .hero {
   background: radial-gradient(140% 180% at 100% -10%, #93c5fd 0%, #3b82f6 28%, #1d4ed8 55%, #1e3a8a 85%);
+  border-color: #172554;
   --mint: #dbeafe; --hero-meta: #bfdbfe;
 }
 .theme-blue .hero h1, .theme-blue .hero .pill.Normal { color: #dbeafe; }
 .theme-gold .hero {
   background: radial-gradient(140% 180% at 100% -10%, #fde68a 0%, #f59e0b 28%, #d97706 55%, #78350f 85%);
+  border-color: #451a03;
   --mint: #fef3c7; --hero-meta: #fef3c7;
 }
 .theme-gold .hero h1, .theme-gold .hero .pill.Normal { color: #fef3c7; }
+
+/* Templar: white card, red cross on the right, dark text, red/grey controls */
 .theme-templar .hero {
-  background: #fff url("https://upload.wikimedia.org/wikipedia/commons/thumb/0/0d/Knights_Templar_Cross.svg/800px-Knights_Templar_Cross.svg.png") center/contain no-repeat;
-  color: #111; --mint: #b91c1c; --hero-meta: #444;
+  background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath d='M42 8h16v84h-16zM8 42h84v16H8z' fill='%23b91c1c'/%3E%3C/svg%3E") right 8px center / 92px no-repeat;
+  color: #111;
+  border-color: #b91c1c;
+  --mint: #b91c1c; --hero-meta: #475569;
 }
-.theme-templar .hero h1, .theme-templar .hero .pill.Normal { color: #b91c1c; }
+.theme-templar .hero h1 { color: #b91c1c; }
+.theme-templar .hero small, .theme-templar .hero .next, .theme-templar .hero .muted { color: #475569; }
+.theme-templar .hero .pill,
+.theme-templar .hero .chip,
+.theme-templar .hero select,
+.theme-templar .hero .ghost {
+  background: #fff;
+  color: #111;
+  border-color: #cbd5e1;
+}
+.theme-templar .hero .pill.Normal,
+.theme-templar .hero .chip.on {
+  color: #b91c1c;
+  border-color: #b91c1c;
+  background: #fef2f2;
+}
+.theme-templar .hero .pill.GVT { color: #9a3412; border-color: #fdba74; }
+
 .theme-union-jack .hero {
   background: #012169 url("https://upload.wikimedia.org/wikipedia/commons/thumb/0/02/Union_Jack_Flag_%28PSF%29.png/800px-Union_Jack_Flag_%28PSF%29.png") center/cover;
+  border-color: #fff;
   --mint: #fff; --hero-meta: #ddd;
 }
 .theme-confederate .hero {
   background: #b91c1c url("https://upload.wikimedia.org/wikipedia/commons/thumb/a/ae/Battle_flag_of_the_Confederate_States_of_America_%28With_White_Border%29.svg/800px-Battle_flag_of_the_Confederate_States_of_America_%28With_White_Border%29.svg.png") center/cover;
+  border-color: #1e3a8a;
   --mint: #fff; --hero-meta: #fecaca;
 }
 .theme-pride .hero {
   background: url("https://upload.wikimedia.org/wikipedia/commons/thumb/4/48/Gay_Pride_Flag.svg/800px-Gay_Pride_Flag.svg.png") center/cover;
+  border-color: #000;
   --mint: #fff; --hero-meta: #fff; color: #fff;
 }
 .theme-pride .hero h1 { text-shadow: 0 1px 2px #0008; }
