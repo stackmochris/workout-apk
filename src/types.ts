@@ -69,6 +69,10 @@ export interface LoggedMovement {
   finished?: boolean;
   /** When the first set of this movement was completed. Used to order the saved log. */
   performedAt?: string;
+  /** Cardio: duration in minutes. */
+  durationMin?: number;
+  /** Cardio: distance in kilometres. */
+  distanceKm?: number;
 }
 
 export interface Session {
