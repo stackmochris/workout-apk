@@ -1,10 +1,13 @@
-export type Focus = 'Chest' | 'Shoulder' | 'Back' | 'Arm' | 'Leg';
-export const FOCI: Focus[] = ['Chest', 'Shoulder', 'Back', 'Arm', 'Leg'];
+export type Focus = 'Chest' | 'Shoulder' | 'Back' | 'Arm' | 'Leg' | 'HIIT' | 'Crossfit';
+export const FOCI: Focus[] = ['Chest', 'Shoulder', 'Back', 'Arm', 'Leg', 'HIIT', 'Crossfit'];
+/** Default rotation stays the original 5 so HIIT/Crossfit are opt-in. */
+export const ROTATION_FOCI: Focus[] = ['Chest', 'Shoulder', 'Back', 'Arm', 'Leg'];
 export type SessionType = 'Normal' | 'GVT';
 export type ActivityType = 'gym' | 'run' | 'walk' | 'hike' | 'calisthenics' | 'other';
 
 export type SplitType = 'per-muscle' | 'push-pull-legs' | 'upper-lower' | 'mixed';
 export type Theme = 'green' | 'red' | 'blue' | 'gold' | 'templar' | 'jerusalem' | 'union-jack' | 'confederate' | 'pride';
+export type Goal = 'strength' | 'hypertrophy' | 'endurance' | 'mixed';
 
 export interface DayTemplate {
   id: string;
@@ -31,6 +34,14 @@ export interface Movement {
   flags: string[];
   notes?: string;
   equipment?: 'barbell' | 'dumbbell' | 'cable' | 'machine' | 'bodyweight';
+}
+
+/** Per-user override for a movement's set/rep guidance. */
+export interface Prescription {
+  sets?: number;
+  repMin?: number | null;
+  repMax?: number | null;
+  notes?: string;
 }
 
 export type SetKind = 'warmup' | 'working' | 'drop' | 'failure';
@@ -98,6 +109,10 @@ export interface Settings {
     watch: string[];
   };
   theme: Theme;
+  /** Drives the set/rep sub-heading shown on each movement. */
+  goal: Goal;
+  /** Per-movement overrides keyed by movement id. */
+  prescriptions?: Record<string, Prescription>;
 }
 
 export interface BodyEntry {
