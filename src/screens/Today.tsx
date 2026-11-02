@@ -67,6 +67,7 @@ export default function Today({ data, setData, prefs }: Props) {
   const [finish, setFinish] = useState<{ session: Session; stats: SessionStats } | null>(null);
   const [editing, setEditing] = useState<string | null>(null);
   const [collapsed, setCollapsed] = useState<Record<number, boolean>>({});
+  const [checkin, setCheckin] = useState<{ weight: string; energy: number; elbow: 'ok' | 'sore' } | null>(null);
   const [tick, setTick] = useState(0);
   const pen = data.settings.penalty;
   const penalty = useMemo(
@@ -82,6 +83,15 @@ export default function Today({ data, setData, prefs }: Props) {
           type: plan.type,
           movements: (DEFAULT_DAY[plan.focus] ?? []).map((id) => byId.get(id)).filter(Boolean).map((m) => blank(m!)),
         };
+
+  
+  useEffect(() => {
+    const start = (() => { const x = new Date(); const day = x.getDay(); const diff = x.getDate() - day + (day === 0 ? -6 : 1); x.setDate(diff); x.setHours(0,0,0,0); return x; })();
+    const has = data.body.some((b) => new Date(b.date) >= start);
+    const skipped = sessionStorage.getItem('checkin-skipped') === start.toISOString().slice(0, 10);
+    if (!has && !skipped && !checkin) setCheckin({ weight: '', energy: 5, elbow: 'ok' });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     if (!draft.startedAt) return;
@@ -101,7 +111,7 @@ export default function Today({ data, setData, prefs }: Props) {
         setData((cur) => ({ ...cur, draft: null }));
         return;
       }
-      if (hasWork && (idle > 3 * 3600_000 || open > 36 * 3600_000)) {
+      if (hasWork && (idle > 5 * 3600_000 || open > 36 * 3600_000)) {
         const now = new Date().toISOString();
         const ordered = byPerformed(d.movements.filter((m) => m.finished || m.durationMin || m.distanceKm || m.sets.some((s) => s.done)));
         const session: Session = {
@@ -140,6 +150,23 @@ export default function Today({ data, setData, prefs }: Props) {
     saveDraft(draft.movements.map((m, i) => i === mi ? { ...m, finished: true } : m));
     setCollapsed((c) => ({ ...c, [mi]: true }));
   };
+  const saveCheckin = () => {
+    if (!checkin) return;
+    const entry = {
+      id: uid(), date: new Date().toISOString(),
+      weight: checkin.weight ? Number(checkin.weight) : undefined,
+      energy: checkin.energy, elbow: checkin.elbow,
+      author: 'app' as const, updatedAt: new Date().toISOString(),
+    };
+    setData((d) => ({ ...d, body: [...d.body, entry] }));
+    setCheckin(null);
+  };
+  const skipCheckin = () => {
+    const x = new Date(); const day = x.getDay(); const diff = x.getDate() - day + (day === 0 ? -6 : 1); x.setDate(diff);
+    sessionStorage.setItem('checkin-skipped', x.toISOString().slice(0, 10));
+    setCheckin(null);
+  };
+
   const reopenMovement = (mi: number) => {
     saveDraft(draft.movements.map((m, i) => i === mi ? { ...m, finished: false } : m));
     setCollapsed((c) => ({ ...c, [mi]: false }));
@@ -416,6 +443,7 @@ export default function Today({ data, setData, prefs }: Props) {
                   <span className="row" style={{ gap: 4 }} onClick={(e) => e.stopPropagation()}>
                     <button className="ghost" disabled={mi === 0} onClick={() => moveCard(mi, -1)} aria-label="Move up">↑</button>
                     <button className="ghost" disabled={mi === draft.movements.length - 1} onClick={() => moveCard(mi, 1)} aria-label="Move down">↓</button>
+                    <button className={`ghost ${lm.gvt ? 'on' : ''}`} onClick={() => saveDraft(draft.movements.map((m, i) => i === mi ? { ...m, gvt: !m.gvt } : m))}>GVT</button>
                     <button className="ghost" onClick={() => setPicker({ mode: 'swap', index: mi })}>Swap</button>
                   </span>
                 </div>
@@ -442,7 +470,12 @@ export default function Today({ data, setData, prefs }: Props) {
                   </p>
                 )}
                 {flagged && mv!.flags.map((f) => <p key={f} className="flag">\u26a0 {FLAG_INFO[f]?.reminder ?? f}</p>)}
-                {isCardio(lm.name) ? (
+                {lm.gvt ? (
+                  <GvtTimer {...data.settings.gvt} sound={data.settings.sound} vibrate={data.settings.vibrate}
+                    startAt={0} weight={null}
+                    onFinish={(reps) => { const now = new Date().toISOString(); saveDraft(draft.movements.map((m, i) => i === mi ? { ...m, performedAt: m.performedAt ?? now, sets: reps.map((r) => ({ reps: r, weight: null, done: true })) } : m)); }}
+                    onAdjust={(reps) => saveDraft(draft.movements.map((m, i) => i === mi ? { ...m, sets: reps.map((r) => ({ reps: r, weight: null, done: true })) } : m))} />
+                ) : isCardio(lm.name) ? (
                   <div className="cardio-inputs" style={{ margin: '8px 0' }}>
                     <div className="row" style={{ gap: 8 }}>
                       <label className="form" style={{ flex: 1 }}>
@@ -461,6 +494,7 @@ export default function Today({ data, setData, prefs }: Props) {
                       {' · '}
                       {kcalLabel(lm.name, lm.durationMin, bodyKg) ?? 'Calories —'}
                       {bodyKg !== 80 ? ` (at ${bodyKg} kg)` : ' (est. at 80 kg)'}
+                      {data.settings.cardioGoal && data.settings.cardioGoal !== 'maintenance' ? ` · Priority: ${data.settings.cardioGoal}` : ''}
                     </p>
                   </div>
                 ) : (
@@ -540,6 +574,31 @@ export default function Today({ data, setData, prefs }: Props) {
           onConfirm={() => commitSession(finish.session)}
         />
       )}
+    
+      {checkin && (
+        <div className="sheet" role="dialog">
+          <div className="sheet-body">
+            <h3>Weekly check-in</h3>
+            <p className="muted">Optional. Skips until next Monday.</p>
+            <label className="form">Weight (kg)
+              <input inputMode="decimal" value={checkin.weight} onChange={(e) => setCheckin({ ...checkin, weight: e.target.value })} placeholder="optional" />
+            </label>
+            <label className="form">Energy (1–10)
+              <input type="range" min={1} max={10} value={checkin.energy} onChange={(e) => setCheckin({ ...checkin, energy: Number(e.target.value) })} />
+              <span>{checkin.energy}</span>
+            </label>
+            <div className="row">
+              <button className={`chip ${checkin.elbow === 'ok' ? 'on' : ''}`} onClick={() => setCheckin({ ...checkin, elbow: 'ok' })}>Elbow ok</button>
+              <button className={`chip ${checkin.elbow === 'sore' ? 'on' : ''}`} onClick={() => setCheckin({ ...checkin, elbow: 'sore' })}>Elbow sore</button>
+            </div>
+            <div className="row" style={{ marginTop: 12 }}>
+              <button className="ghost" onClick={skipCheckin}>Skip</button>
+              <button className="primary" onClick={saveCheckin}>Save</button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </section>
   );
 }
