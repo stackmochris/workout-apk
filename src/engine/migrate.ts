@@ -35,6 +35,7 @@ export const DEFAULT_SETTINGS: Settings = {
   },
   theme: 'green',
   goal: 'mixed',
+  cardioGoal: 'maintenance',
   prescriptions: {},
 };
 
@@ -65,6 +66,7 @@ export function migrate(raw: unknown): AppData {
       frequency: { ...DEFAULT_SETTINGS.frequency, ...d.settings?.frequency },
       theme: d.settings?.theme ?? 'green',
       goal: d.settings?.goal ?? 'mixed',
+      cardioGoal: d.settings?.cardioGoal ?? 'maintenance',
       prescriptions: d.settings?.prescriptions ?? {},
     },
   };
