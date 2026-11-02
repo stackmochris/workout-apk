@@ -64,6 +64,37 @@ export default function Today({ data, setData, prefs }: Props) {
     const id = setInterval(() => setTick((t) => t + 1), 1000);
     return () => clearInterval(id);
   }, [draft.startedAt]);
+  useEffect(() => {
+    const d = data.draft;
+    if (!d) return;
+    const check = () => {
+      const last = d.lastInputAt || d.startedAt;
+      if (!last) return;
+      const idle = Date.now() - new Date(last).getTime();
+      const open = d.startedAt ? Date.now() - new Date(d.startedAt).getTime() : idle;
+      const hasWork = d.movements.some((m) => m.finished || m.sets.some((s) => s.done));
+      if (!hasWork && open > 36 * 3600_000) {
+        setData((cur) => ({ ...cur, draft: null }));
+        return;
+      }
+      if (hasWork && (idle > 3 * 3600_000 || open > 36 * 3600_000)) {
+        const now = new Date().toISOString();
+        const ordered = byPerformed(d.movements.filter((m) => m.finished || m.sets.some((s) => s.done)));
+        const session: Session = {
+          id: uid(), date: now, focus: d.focus as Focus, type: d.type as SessionType, status: 'completed',
+          movements: ordered, author: 'app', updatedAt: now,
+          durationMin: d.startedAt ? Math.max(1, Math.round((Date.now() - new Date(d.startedAt).getTime()) / 60000)) : undefined,
+          notes: 'Auto-finished (idle)',
+        };
+        commitSession(session);
+      }
+    };
+    check();
+    const id = setInterval(check, 60_000);
+    return () => clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data.draft?.lastInputAt, data.draft?.startedAt]);
+
 
   const elapsed = draft.startedAt
     ? Math.max(0, Math.floor((Date.now() - new Date(draft.startedAt).getTime()) / 1000))
@@ -71,7 +102,7 @@ export default function Today({ data, setData, prefs }: Props) {
   const elapsedLabel = `${Math.floor(elapsed / 60)}:${String(elapsed % 60).padStart(2, '0')}`;
 
   const saveDraft = (movements: LoggedMovement[], extra: Partial<NonNullable<AppData['draft']>> = {}) =>
-    setData((d) => ({ ...d, draft: { ...draft, movements, ...extra } }));
+    setData((d) => ({ ...d, draft: { ...draft, movements, lastInputAt: new Date().toISOString(), ...extra } }));
   
   const setMovementNotes = (mi: number, notes: string) =>
     saveDraft(draft.movements.map((m, i) => i === mi ? { ...m, notes: notes || undefined } : m));
@@ -106,8 +137,9 @@ export default function Today({ data, setData, prefs }: Props) {
   const updateSet = (mi: number, si: number, patch: { reps?: number | null; weight?: number | null; dropStart?: number | null; dropEnd?: number | null }) => {
     const was = draft.movements[mi].sets[si].done;
     const updated = editSet(draft.movements[mi].sets[si], patch);
+    const stamp = updated.done && !was && !draft.movements[mi].performedAt ? new Date().toISOString() : undefined;
     const movements = draft.movements.map((m, i) =>
-      i !== mi ? m : { ...m, sets: m.sets.map((s, j) => (j === si ? updated : s)) },
+      i !== mi ? m : { ...m, performedAt: stamp ?? m.performedAt, sets: m.sets.map((s, j) => (j === si ? updated : s)) },
     );
     const extra = !draft.startedAt && updated.done && !was ? { startedAt: new Date().toISOString() } : {};
     saveDraft(movements, extra);
@@ -147,11 +179,27 @@ export default function Today({ data, setData, prefs }: Props) {
     }
   };
 
+  
+  const byPerformed = (list: LoggedMovement[]) =>
+    [...list].sort((a, b) => {
+      const ta = a.performedAt ? new Date(a.performedAt).getTime() : Infinity;
+      const tb = b.performedAt ? new Date(b.performedAt).getTime() : Infinity;
+      return ta - tb;
+    });
+
+  const moveCard = (mi: number, dir: -1 | 1) => {
+    const next = mi + dir;
+    if (next < 0 || next >= draft.movements.length) return;
+    const list = [...draft.movements];
+    [list[mi], list[next]] = [list[next], list[mi]];
+    saveDraft(list);
+  };
+
   const requestFinish = (status: Session['status'], extra: Partial<Session> = {}) => {
     const now = new Date().toISOString();
     const session: Session = {
       id: uid(), date: now, focus: plan.focus, type: plan.type, status,
-      movements: status === 'completed' ? draft.movements.filter((m) => m.sets.some((s) => s.done) || extra.gvtRepsPerMinute) : [],
+      movements: status === 'completed' ? byPerformed(draft.movements.filter((m) => m.finished || m.sets.some((s) => s.done) || extra.gvtRepsPerMinute)) : [],
       author: 'app', updatedAt: now,
       durationMin: draft.startedAt ? Math.max(1, Math.round((Date.now() - new Date(draft.startedAt).getTime()) / 60000)) : undefined,
       ...extra,
@@ -335,7 +383,11 @@ export default function Today({ data, setData, prefs }: Props) {
                     <h3>{lm.name}{complete ? (collapsed[mi] === false ? ' ▾' : ' ▸') : ''}</h3>
                     <small>{mv?.target}{mv?.notes ? ` \u00b7 ${mv.notes}` : ''}</small>
                   </div>
-                  <button className="ghost" onClick={(e) => { e.stopPropagation(); setPicker({ mode: 'swap', index: mi }); }}>Swap</button>
+                  <span className="row" style={{ gap: 4 }} onClick={(e) => e.stopPropagation()}>
+                    <button className="ghost" disabled={mi === 0} onClick={() => moveCard(mi, -1)} aria-label="Move up">↑</button>
+                    <button className="ghost" disabled={mi === draft.movements.length - 1} onClick={() => moveCard(mi, 1)} aria-label="Move down">↓</button>
+                    <button className="ghost" onClick={() => setPicker({ mode: 'swap', index: mi })}>Swap</button>
+                  </span>
                 </div>
                 {complete && collapsed[mi] !== false ? null : (
                 <>
