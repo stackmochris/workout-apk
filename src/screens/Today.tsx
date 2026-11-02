@@ -471,10 +471,22 @@ export default function Today({ data, setData, prefs }: Props) {
                 )}
                 {flagged && mv!.flags.map((f) => <p key={f} className="flag">\u26a0 {FLAG_INFO[f]?.reminder ?? f}</p>)}
                 {lm.gvt ? (
-                  <GvtTimer {...data.settings.gvt} sound={data.settings.sound} vibrate={data.settings.vibrate}
-                    startAt={0} weight={null}
-                    onFinish={(reps) => { const now = new Date().toISOString(); saveDraft(draft.movements.map((m, i) => i === mi ? { ...m, performedAt: m.performedAt ?? now, sets: reps.map((r) => ({ reps: r, weight: null, done: true })) } : m)); }}
-                    onAdjust={(reps) => saveDraft(draft.movements.map((m, i) => i === mi ? { ...m, sets: reps.map((r) => ({ reps: r, weight: null, done: true })) } : m))} />
+                  <div>
+                    {blocks(lm.sets).length > 0 && (
+                      <p className="muted" style={{ margin: '4px 0 8px' }}>
+                        {blocks(lm.sets).map(blockLabel).join(' · ')}
+                      </p>
+                    )}
+                    <div className="gvt-start" style={{ marginBottom: 8 }}>
+                      <NumInput kind="kg" label={`${lm.name} kg`} value={gvtKg[mi] ?? null}
+                        placeholder={(() => { const p = previousFor(data.sessions, lm.movementId); const w = p ? [...p.sets].reverse().find((x) => x.done && x.weight != null)?.weight : undefined; return w != null ? String(w) : 'kg'; })()}
+                        onChange={(n) => setGvtKg((k) => ({ ...k, [mi]: n }))} />
+                    </div>
+                    <GvtTimer key={`${mi}-${doneSets(lm)}`} {...data.settings.gvt} sound={data.settings.sound} vibrate={data.settings.vibrate}
+                      startAt={doneSets(lm)} weight={gvtKg[mi] ?? null}
+                      onFinish={(reps) => { logGvt(mi, gvtKg[mi] ?? null, reps); setGvtKg((k) => ({ ...k, [mi]: null })); }}
+                      onAdjust={(reps) => { logGvt(mi, gvtKg[mi] ?? null, reps); setGvtKg((k) => ({ ...k, [mi]: null })); }} />
+                  </div>
                 ) : isCardio(lm.name) ? (
                   <div className="cardio-inputs" style={{ margin: '8px 0' }}>
                     <div className="row" style={{ gap: 8 }}>
