@@ -1,6 +1,6 @@
-export type Focus = 'Chest' | 'Shoulder' | 'Back' | 'Arm' | 'Leg' | 'HIIT' | 'Crossfit' | 'Freestyle';
-export const FOCI: Focus[] = ['Chest', 'Shoulder', 'Back', 'Arm', 'Leg', 'HIIT', 'Crossfit', 'Freestyle'];
-/** Default rotation stays the original 5 so HIIT/Crossfit/Freestyle are opt-in. */
+export type Focus = 'Chest' | 'Shoulder' | 'Back' | 'Arm' | 'Leg' | 'HIIT' | 'Crossfit' | 'Freestyle' | 'NoGym';
+export const FOCI: Focus[] = ['Chest', 'Shoulder', 'Back', 'Arm', 'Leg', 'HIIT', 'Crossfit', 'Freestyle', 'NoGym'];
+/** Default rotation stays the original 5 so optional foci are opt-in. */
 export const ROTATION_FOCI: Focus[] = ['Chest', 'Shoulder', 'Back', 'Arm', 'Leg'];
 export type SessionType = 'Normal' | 'GVT';
 export type ActivityType = 'gym' | 'run' | 'walk' | 'hike' | 'calisthenics' | 'other';
