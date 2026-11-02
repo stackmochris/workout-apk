@@ -34,6 +34,8 @@ export const DEFAULT_SETTINGS: Settings = {
     watch: ['Chest', 'Shoulder', 'Back', 'Arm', 'Leg', 'push', 'pull'],
   },
   theme: 'green',
+  goal: 'mixed',
+  prescriptions: {},
 };
 
 export function freshData(): AppData {
@@ -51,6 +53,7 @@ export function migrate(raw: unknown): AppData {
     ...d,
     version: 2,
     movements,
+    rotation: d.rotation ?? fresh.rotation,
     sessions: Array.isArray(d.sessions) ? d.sessions : [],
     body: Array.isArray(d.body) ? d.body : [],
     settings: {
@@ -61,6 +64,8 @@ export function migrate(raw: unknown): AppData {
       targets: { ...DEFAULT_SETTINGS.targets, ...d.settings?.targets },
       frequency: { ...DEFAULT_SETTINGS.frequency, ...d.settings?.frequency },
       theme: d.settings?.theme ?? 'green',
+      goal: d.settings?.goal ?? 'mixed',
+      prescriptions: d.settings?.prescriptions ?? {},
     },
   };
 }
