@@ -1,9 +1,8 @@
 import { Movement } from '../types';
 
 /**
- * Seed movement library (brief §3.3). Rep ranges come from the Notion training logs
- * (Phase 1 tracker, The Build Phase 3, Cut Block) and the earlier tracker in stackmochris/Tools.
- * repMax null = AMRAP / max reps. Editable in Settings (M3).
+ * Seed movement library. Rep ranges are defaults; the displayed sub-heading is
+ * computed from the user's goal + any per-movement override (see prescription.ts).
  */
 type Seed = [name: string, sets: number, repMin: number | null, repMax: number | null, equipment: Movement['equipment'], notes?: string, elbow?: boolean];
 
@@ -63,6 +62,37 @@ const seeds: Record<Movement['focus'], Seed[]> = {
     ['Burpees', 2, null, null, 'bodyweight'],
     ['Incline treadmill walk', 1, null, null, 'bodyweight'],
   ],
+  HIIT: [
+    ['Burpee intervals', 8, 8, 12, 'bodyweight', '20s on / 10s off'],
+    ['Mountain climbers', 8, 20, 30, 'bodyweight', '20s on / 10s off'],
+    ['Jump squats', 6, 10, 15, 'bodyweight', 'Explosive, land soft'],
+    ['High knees', 8, 20, 30, 'bodyweight', '20s on / 10s off'],
+    ['Battle ropes', 6, 15, 20, 'bodyweight', 'Alternating waves'],
+    ['Kettlebell swings', 5, 12, 20, 'dumbbell', 'Hip drive, not a squat'],
+    ['Box jumps', 5, 6, 10, 'bodyweight', 'Step down to reset'],
+    ['Sprint intervals', 8, null, null, 'bodyweight', '30s hard / 60s easy'],
+    ['Plank jacks', 6, 12, 20, 'bodyweight'],
+    ['Jumping lunges', 5, 8, 12, 'bodyweight', 'Per leg'],
+    ['Rowing intervals', 6, null, null, 'machine', '250m hard / 60s easy'],
+    ['Assault bike', 8, null, null, 'machine', '20s max / 40s easy'],
+  ],
+  Crossfit: [
+    ['Thruster', 5, 5, 8, 'barbell', 'Full squat + press'],
+    ['Wall ball', 4, 15, 20, 'dumbbell', 'Squat depth, hit the target'],
+    ['Double-unders', 4, 30, 50, 'bodyweight', 'Or single-unders if learning'],
+    ['Toes-to-bar', 4, 8, 12, 'bodyweight', 'Kip or strict'],
+    ['Power clean', 5, 3, 5, 'barbell', 'Explosive second pull'],
+    ['Snatch', 5, 2, 3, 'barbell', 'Or power snatch'],
+    ['Pull-up (kipping or strict)', 4, 8, 12, 'bodyweight'],
+    ['Handstand push-up', 4, 5, 8, 'bodyweight', 'Or pike on box'],
+    ['Box jump-over', 4, 10, 15, 'bodyweight'],
+    ['Deadlift', 5, 3, 5, 'barbell', 'Reset each rep'],
+    ['Row (calories or meters)', 4, null, null, 'machine', 'e.g. 250m or 15 cal'],
+    ['Dumbbell snatch', 4, 6, 10, 'dumbbell', 'Per arm'],
+    ['Burpee over bar', 4, 8, 12, 'bodyweight'],
+    ['GHD sit-up', 3, 10, 15, 'machine'],
+    ['Rope climb', 3, 1, 3, 'bodyweight', 'Or lying rope pulls'],
+  ],
 };
 
 const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
@@ -96,6 +126,8 @@ export const DEFAULT_DAY: Record<string, string[]> = {
   Back: ['assisted-pull-up-smith-band-scapular-pull-ups', 'lat-pulldown-paused-controlled', 'chest-supported-row-incl-wide-and-neutral-grip', 'straight-arm-pulldown-straight-arm-cable-pullover'],
   Arm: ['incline-db-curl', 'oh-cable-tricep-extension', 'bayesian-cable-curl', 'tricep-pushdown-rope-pushdown'],
   Leg: ['barbell-rdl-db-rdl', 'leg-press-or-hack', 'leg-curl', 'calf-raise'],
+  HIIT: ['burpee-intervals', 'mountain-climbers', 'kettlebell-swings', 'sprint-intervals'],
+  Crossfit: ['thruster', 'wall-ball', 'pull-up-kipping-or-strict', 'double-unders'],
 };
 
 /** 100-rep bodyweight swap defaults (brief §5.13), used in M2. */
@@ -105,4 +137,6 @@ export const SWAP_DEFAULTS: Record<string, { name: string; alt?: string }> = {
   Leg: { name: '100 split squats (50 per leg)' },
   Shoulder: { name: '100 pike push-ups' },
   Arm: { name: '100 bench / chair dips', alt: '100 diamond push-ups (elbow-friendly)' },
+  HIIT: { name: '20 min EMOM (burpees / squats)' },
+  Crossfit: { name: '20 min AMRAP (thrusters / pull-ups)' },
 };
