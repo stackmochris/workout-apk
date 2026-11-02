@@ -14,9 +14,9 @@ function SessionCard({ s }: { s: Session }) {
       </div>
       {s.status === 'skipped' ? <p className="muted">Skipped</p> : s.movements.map((m) => (
         <p key={m.movementId} className="hist-line"><span>{m.name}</span>
-          <span className="muted">{s.swap ? m.sets.map((x) => x.reps ?? 0).join(' + ')
+          <span className="muted">{cardioLine(m) ?? (s.swap ? m.sets.map((x) => x.reps ?? 0).join(' + ')
             : s.type === 'GVT' ? blocks(m.sets).map(blockLabel).join(', ')
-            : m.sets.filter((x) => x.done).map((x) => `${x.kind && x.kind !== 'working' ? `${x.kind[0].toUpperCase()} ` : ''}${x.weight ?? '–'}×${x.reps ?? '–'}`).join('  ')}</span></p>
+            : m.sets.filter((x) => x.done).map((x) => `${x.kind && x.kind !== 'working' ? `${x.kind[0].toUpperCase()} ` : ''}${x.weight ?? '–'}×${x.reps ?? '–'}`).join('  '))}</span></p>
       ))}
       {s.gvtRepsPerMinute && <p className="muted">GVT: {s.gvtRepsPerMinute.reduce((a, b) => a + b, 0)} reps over {s.gvtRepsPerMinute.length} min</p>}
     </article>
@@ -82,6 +82,20 @@ function InsightsModal({ g, data, onClose }: { g: Exclude<Group, { kind: 'day' }
   );
 }
 
+
+function cardioLine(m: { name: string; durationMin?: number; distanceKm?: number }): string | null {
+  if (!m.durationMin && !m.distanceKm) return null;
+  const parts: string[] = [];
+  if (m.durationMin) parts.push(`${m.durationMin} min`);
+  if (m.distanceKm) parts.push(`${m.distanceKm} km`);
+  if (m.durationMin && m.distanceKm && m.distanceKm > 0) {
+    const total = m.durationMin / m.distanceKm;
+    const mm = Math.floor(total);
+    const ss = Math.round((total - mm) * 60);
+    parts.push(`${mm}:${String(ss).padStart(2, '0')} /km`);
+  }
+  return parts.join(' · ');
+}
 export default function History({ data }: { data: AppData }) {
   const [view, setView] = useState<'sessions' | 'movement'>('sessions');
   const [mid, setMid] = useState('');
