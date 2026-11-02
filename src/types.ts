@@ -8,6 +8,7 @@ export type ActivityType = 'gym' | 'run' | 'walk' | 'hike' | 'calisthenics' | 'o
 export type SplitType = 'per-muscle' | 'push-pull-legs' | 'upper-lower' | 'mixed';
 export type Theme = 'green' | 'red' | 'blue' | 'gold' | 'templar' | 'jerusalem' | 'union-jack' | 'confederate' | 'pride';
 export type Goal = 'strength' | 'hypertrophy' | 'endurance' | 'mixed';
+export type CardioGoal = 'maintenance' | 'calories' | 'pace' | 'distance' | 'time';
 
 export interface DayTemplate {
   id: string;
@@ -73,6 +74,8 @@ export interface LoggedMovement {
   durationMin?: number;
   /** Cardio: distance in kilometres. */
   distanceKm?: number;
+  /** This movement is being run as a GVT block inside a normal session. */
+  gvt?: boolean;
 }
 
 export interface Session {
@@ -121,6 +124,8 @@ export interface Settings {
   theme: Theme;
   /** Drives the set/rep sub-heading shown on each movement. */
   goal: Goal;
+  /** What cardio cards should prioritise. */
+  cardioGoal?: CardioGoal;
   /** Per-movement overrides keyed by movement id. */
   prescriptions?: Record<string, Prescription>;
 }
@@ -131,6 +136,8 @@ export interface BodyEntry {
   weight?: number;
   bodyFat?: number;
   waist?: number;
+  energy?: number;
+  elbow?: 'ok' | 'sore';
   author: 'app' | 'assistant';
   updatedAt: string;
 }
