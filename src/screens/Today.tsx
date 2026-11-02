@@ -19,6 +19,8 @@ import { blockLabel, blocks, doneSets, logBlock } from '../engine/gvt';
 import { FOCI, Focus, SessionType } from '../types';
 import FinishSheet from '../components/FinishSheet';
 import { computeSessionStats, SessionStats } from '../engine/sessionStats';
+import { displayTarget } from '../engine/prescription';
+import { Goal, Prescription } from '../types';
 
 type Props = { data: AppData; setData: React.Dispatch<React.SetStateAction<AppData>>; prefs?: UserPrefs };
 
@@ -39,6 +41,7 @@ export default function Today({ data, setData, prefs }: Props) {
   const [gvtPicks, setGvtPicks] = useState<string[] | null>(null);
   const [swapping, setSwapping] = useState(false);
   const [finish, setFinish] = useState<{ session: Session; stats: SessionStats } | null>(null);
+  const [editing, setEditing] = useState<string | null>(null);
   const [tick, setTick] = useState(0);
   const pen = data.settings.penalty;
   const penalty = useMemo(
@@ -68,6 +71,16 @@ export default function Today({ data, setData, prefs }: Props) {
 
   const saveDraft = (movements: LoggedMovement[], extra: Partial<NonNullable<AppData['draft']>> = {}) =>
     setData((d) => ({ ...d, draft: { ...draft, movements, ...extra } }));
+  const savePrescription = (id: string, patch: Prescription) => {
+    setData((d) => ({
+      ...d,
+      settings: {
+        ...d.settings,
+        prescriptions: { ...d.settings.prescriptions, [id]: { ...d.settings.prescriptions?.[id], ...patch } },
+      },
+    }));
+  };
+
 
   const startTimer = () => {
     if (draft.startedAt) return;
@@ -308,6 +321,19 @@ export default function Today({ data, setData, prefs }: Props) {
                   </div>
                   <button className="ghost" onClick={() => setPicker({ mode: 'swap', index: mi })}>Swap</button>
                 </div>
+                {mv && editing === mv.id && (
+                  <div className="row" style={{ margin: '8px 0', gap: 6 }}>
+                    <input style={{ width: 60 }} inputMode="numeric" placeholder="sets" defaultValue={data.settings.prescriptions?.[mv.id]?.sets ?? mv.sets}
+                      onBlur={(e) => savePrescription(mv.id, { sets: e.target.value ? Number(e.target.value) : undefined })} />
+                    <input style={{ width: 70 }} inputMode="numeric" placeholder="min" defaultValue={data.settings.prescriptions?.[mv.id]?.repMin ?? mv.repMin ?? ''}
+                      onBlur={(e) => savePrescription(mv.id, { repMin: e.target.value ? Number(e.target.value) : null })} />
+                    <input style={{ width: 70 }} inputMode="numeric" placeholder="max" defaultValue={data.settings.prescriptions?.[mv.id]?.repMax ?? mv.repMax ?? ''}
+                      onBlur={(e) => savePrescription(mv.id, { repMax: e.target.value ? Number(e.target.value) : null })} />
+                    <input style={{ flex: 1 }} placeholder="notes" defaultValue={data.settings.prescriptions?.[mv.id]?.notes ?? mv.notes ?? ''}
+                      onBlur={(e) => savePrescription(mv.id, { notes: e.target.value || undefined })} />
+                    <button className="ghost" onClick={() => { savePrescription(mv.id, {}); setEditing(null); }}>Done</button>
+                  </div>
+                )}
                 {sug.reason !== 'none' && (
                   <p className="suggest">
                     <b>Next: {sugP.weight != null ? `${sugP.weight} kg \u00d7 ` : ''}{sugP.reps}</b>
