@@ -192,20 +192,20 @@ label.file input { position: absolute; inset: 0; opacity: 0; width: 100%; max-wi
 }
 .theme-gold .hero h1, .theme-gold .hero .pill.Normal { color: #fef3c7; }
 .theme-templar .hero {
-  background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' fill='%23fff'/%3E%3Cpath d='M45 20h10v60h-10zM20 45h60v10H20z' fill='%23b91c1c'/%3E%3C/svg%3E") center/cover;
+  background: #fff url("https://upload.wikimedia.org/wikipedia/commons/thumb/0/0d/Knights_Templar_Cross.svg/800px-Knights_Templar_Cross.svg.png") center/contain no-repeat;
   color: #111; --mint: #b91c1c; --hero-meta: #444;
 }
 .theme-templar .hero h1, .theme-templar .hero .pill.Normal { color: #b91c1c; }
 .theme-union-jack .hero {
-  background: #012169 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 60 30'%3E%3CclipPath id='t'%3E%3Cpath d='M0,0 v30 h60 v-30 z'/%3E%3C/clipPath%3E%3Cpath d='M0,0 L60,30 M60,0 L0,30' stroke='%23fff' stroke-width='6' clip-path='url(%23t)'/%3E%3Cpath d='M0,0 L60,30 M60,0 L0,30' stroke='%23C8102E' stroke-width='4' clip-path='url(%23t)'/%3E%3Cpath d='M30,0 v30 M0,15 h60' stroke='%23fff' stroke-width='10'/%3E%3Cpath d='M30,0 v30 M0,15 h60' stroke='%23C8102E' stroke-width='6'/%3E%3C/svg%3E") center/cover;
+  background: #012169 url("https://upload.wikimedia.org/wikipedia/commons/thumb/0/02/Union_Jack_Flag_%28PSF%29.png/800px-Union_Jack_Flag_%28PSF%29.png") center/cover;
   --mint: #fff; --hero-meta: #ddd;
 }
 .theme-confederate .hero {
-  background: #b91c1c url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath d='M0 0 L100 100 M100 0 L0 100' stroke='%23000' stroke-width='12'/%3E%3Cpath d='M0 0 L100 100 M100 0 L0 100' stroke='%23fff' stroke-width='6'/%3E%3Ccircle cx='50' cy='50' r='4' fill='%23fff'/%3E%3C/svg%3E") center/cover;
+  background: #b91c1c url("https://upload.wikimedia.org/wikipedia/commons/thumb/a/ae/Battle_flag_of_the_Confederate_States_of_America_%28With_White_Border%29.svg/800px-Battle_flag_of_the_Confederate_States_of_America_%28With_White_Border%29.svg.png") center/cover;
   --mint: #fff; --hero-meta: #fecaca;
 }
 .theme-pride .hero {
-  background: linear-gradient(180deg, #e40303 16.6%, #ff8c00 16.6% 33.2%, #ffed00 33.2% 49.8%, #008026 49.8% 66.4%, #004dff 66.4% 83%, #732982 83%);
+  background: url("https://upload.wikimedia.org/wikipedia/commons/thumb/4/48/Gay_Pride_Flag.svg/800px-Gay_Pride_Flag.svg.png") center/cover;
   --mint: #fff; --hero-meta: #fff; color: #fff;
 }
 .theme-pride .hero h1 { text-shadow: 0 1px 2px #0008; }
