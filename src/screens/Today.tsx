@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { completeSession, currentPlan, preview, skipSession } from '../engine/rotation';
 import { DEFAULT_DAY, FLAG_INFO, SWAP_DEFAULTS } from '../data/movements';
 import { penalisedHint, penaltyState } from '../engine/week';
@@ -17,6 +17,8 @@ import NumInput from '../components/NumInput';
 import { editSet } from '../engine/sets';
 import { blockLabel, blocks, doneSets, logBlock } from '../engine/gvt';
 import { FOCI, Focus, SessionType } from '../types';
+import FinishSheet from '../components/FinishSheet';
+import { computeSessionStats, SessionStats } from '../engine/sessionStats';
 
 type Props = { data: AppData; setData: React.Dispatch<React.SetStateAction<AppData>>; prefs?: UserPrefs };
 
@@ -36,6 +38,8 @@ export default function Today({ data, setData, prefs }: Props) {
   const [rest, setRest] = useState<RestCue>({ n: 0, seconds: 0 });
   const [gvtPicks, setGvtPicks] = useState<string[] | null>(null);
   const [swapping, setSwapping] = useState(false);
+  const [finish, setFinish] = useState<{ session: Session; stats: SessionStats } | null>(null);
+  const [tick, setTick] = useState(0);
   const pen = data.settings.penalty;
   const penalty = useMemo(
     () => penaltyState(data.sessions, new Date(), data.settings.summaryThreshold, pen.stack),
@@ -51,7 +55,26 @@ export default function Today({ data, setData, prefs }: Props) {
           movements: (DEFAULT_DAY[plan.focus] ?? []).map((id) => byId.get(id)).filter(Boolean).map((m) => blank(m!)),
         };
 
-  const saveDraft = (movements: LoggedMovement[]) => setData((d) => ({ ...d, draft: { ...draft, movements } }));
+  useEffect(() => {
+    if (!draft.startedAt) return;
+    const id = setInterval(() => setTick((t) => t + 1), 1000);
+    return () => clearInterval(id);
+  }, [draft.startedAt]);
+
+  const elapsed = draft.startedAt
+    ? Math.max(0, Math.floor((Date.now() - new Date(draft.startedAt).getTime()) / 1000))
+    : 0;
+  const elapsedLabel = `${Math.floor(elapsed / 60)}:${String(elapsed % 60).padStart(2, '0')}`;
+
+  const saveDraft = (movements: LoggedMovement[], extra: Partial<NonNullable<AppData['draft']>> = {}) =>
+    setData((d) => ({ ...d, draft: { ...draft, movements, ...extra } }));
+
+  const startTimer = () => {
+    if (draft.startedAt) return;
+    saveDraft(draft.movements, { startedAt: new Date().toISOString() });
+  };
+
+  const stopTimer = () => saveDraft(draft.movements, { startedAt: undefined });
 
   const updateSet = (mi: number, si: number, patch: { reps?: number | null; weight?: number | null; dropStart?: number | null; dropEnd?: number | null }) => {
     const was = draft.movements[mi].sets[si].done;
@@ -59,7 +82,8 @@ export default function Today({ data, setData, prefs }: Props) {
     const movements = draft.movements.map((m, i) =>
       i !== mi ? m : { ...m, sets: m.sets.map((s, j) => (j === si ? updated : s)) },
     );
-    saveDraft(movements);
+    const extra = !draft.startedAt && updated.done && !was ? { startedAt: new Date().toISOString() } : {};
+    saveDraft(movements, extra);
     if (updated.done && !was) {
       if (data.settings.vibrate) buzz(40);
       cueRest(movements, mi, si);
@@ -96,19 +120,30 @@ export default function Today({ data, setData, prefs }: Props) {
     }
   };
 
-  const finish = (status: Session['status'], extra: Partial<Session> = {}) => {
+  const requestFinish = (status: Session['status'], extra: Partial<Session> = {}) => {
     const now = new Date().toISOString();
     const session: Session = {
       id: uid(), date: now, focus: plan.focus, type: plan.type, status,
       movements: status === 'completed' ? draft.movements.filter((m) => m.sets.some((s) => s.done) || extra.gvtRepsPerMinute) : [],
-      author: 'app', updatedAt: now, ...extra,
+      author: 'app', updatedAt: now,
+      durationMin: draft.startedAt ? Math.max(1, Math.round((Date.now() - new Date(draft.startedAt).getTime()) / 60000)) : undefined,
+      ...extra,
     };
-    if (status === 'completed' && !extra.swap && !confirm(onPlan ? `Finish ${plan.focus} (${plan.type}) and advance the rotation?` : `Log ${plan.focus} (${plan.type})? It is not today's planned session, so the rotation stays put.`)) return;
-    if (status === 'skipped' && !confirm(`Skip ${plan.focus}? The plan rolls forward to the next focus.`)) return;
+    if (status === 'skipped') {
+      if (!confirm(`Skip ${plan.focus}? The plan rolls forward to the next focus.`)) return;
+      commitSession(session);
+      return;
+    }
+    const stats = computeSessionStats(session, data.sessions, draft.startedAt);
+    setFinish({ session, stats });
+  };
+
+  const commitSession = (session: Session) => {
+    const onPlanNow = session.focus === planned.focus && session.type === planned.type;
     setData((d) => ({
       ...d,
       sessions: [...d.sessions, session],
-      rotation: !onPlan ? d.rotation : status === 'completed' ? completeSession(d.rotation) : skipSession(d.rotation),
+      rotation: !onPlanNow ? d.rotation : session.status === 'completed' ? completeSession(d.rotation) : skipSession(d.rotation),
       draft: null,
     }));
     setGvtPicks(null);
@@ -116,11 +151,13 @@ export default function Today({ data, setData, prefs }: Props) {
     setGvtKg({});
     setBrowse(null);
     setSwapping(false);
+    setFinish(null);
   };
 
   const logGvt = (mi: number, weight: number | null, reps: number[]) => {
     if (!reps.length) return;
-    saveDraft(draft.movements.map((m, i) => (i === mi ? logBlock(m, weight, reps) : m)));
+    if (!draft.startedAt) saveDraft(draft.movements.map((m, i) => (i === mi ? logBlock(m, weight, reps) : m)), { startedAt: new Date().toISOString() });
+    else saveDraft(draft.movements.map((m, i) => (i === mi ? logBlock(m, weight, reps) : m)));
   };
 
   const pick = (m: Movement) => {
@@ -145,6 +182,7 @@ export default function Today({ data, setData, prefs }: Props) {
           <span className={`pill ${plan.type}`}>{plan.type}</span>
           <span className="pill dim">Cycle {plan.cycleStep}/3</span>
           {plan.type === 'Normal' && <span className="pill dim">{doneCount}/{draft.movements.length} done</span>}
+          {draft.startedAt && <span className="pill">{elapsedLabel}</span>}
         </div>
         <div className="browse">
           <select aria-label="Browse focus" value={plan.focus} onChange={(e) => { setGvtPicks(null); setGvtRun(null); const f = e.target.value as Focus; setBrowse(f === planned.focus && plan.type === planned.type ? null : { focus: f, type: plan.type }); }}>
@@ -154,6 +192,11 @@ export default function Today({ data, setData, prefs }: Props) {
             <button key={t} className={`chip ${plan.type === t ? 'on' : ''}`} onClick={() => { setGvtPicks(null); setGvtRun(null); setBrowse(plan.focus === planned.focus && t === planned.type ? null : { focus: plan.focus, type: t }); }}>{t}</button>
           ))}
           {browse && <button className="ghost" onClick={() => { setBrowse(null); setGvtPicks(null); setGvtRun(null); }}>Back to today</button>}
+        </div>
+        <div className="row" style={{ marginTop: 8 }}>
+          {!draft.startedAt
+            ? <button className="chip" onClick={startTimer}>Start workout</button>
+            : <button className="chip" onClick={stopTimer}>Stop timer</button>}
         </div>
         {!onPlan && <p className="muted small">Browsing. Logging this won't move the rotation.</p>}
         {tired.length > 0 && <p className="recovery">Probably still recovering: {tired.map(label).join(', ')}. Go lighter on those or pick another focus.</p>}
@@ -177,8 +220,7 @@ export default function Today({ data, setData, prefs }: Props) {
           option={SWAP_DEFAULTS[plan.focus]}
           onCancel={() => setSwapping(false)}
           onFinish={(name, reps) => {
-            if (!confirm(`Log ${name} as today's ${plan.focus} session and advance the rotation?`)) return;
-            finish('completed', {
+            requestFinish('completed', {
               swap: true,
               movements: [{ movementId: `swap-${plan.focus.toLowerCase()}`, name, sets: reps.map((r) => ({ reps: r, weight: null, done: true })) }],
             });
@@ -238,7 +280,7 @@ export default function Today({ data, setData, prefs }: Props) {
                 );
               })}
               <button className="primary wide" disabled={!draft.movements.slice(0, 3).some((m) => doneSets(m) > 0)}
-                onClick={() => finish('completed', { movements: draft.movements.slice(0, 3).filter((m) => doneSets(m) > 0), gvtRepsPerMinute: draft.movements.slice(0, 3).flatMap((m) => m.sets.filter((x) => x.done).map((x) => x.reps ?? 0)) })}>
+                onClick={() => requestFinish('completed', { movements: draft.movements.slice(0, 3).filter((m) => doneSets(m) > 0), gvtRepsPerMinute: draft.movements.slice(0, 3).flatMap((m) => m.sets.filter((x) => x.done).map((x) => x.reps ?? 0)) })}>
                 Finish GVT session
               </button>
               <button className="ghost wide" onClick={() => setGvtPicks(null)}>Change movements</button>
@@ -308,11 +350,11 @@ export default function Today({ data, setData, prefs }: Props) {
             );
           })}
           <button className="ghost wide" onClick={() => setPicker({ mode: 'add' })}>+ Add movement</button>
-          <button className="primary wide" onClick={() => finish('completed')}>Finish session</button>
+          <button className="primary wide" onClick={() => requestFinish('completed')}>Finish session</button>
         </>
       )}
       <div className="row center">
-        {onPlan && <button className="ghost" onClick={() => finish('skipped')}>Skip {plan.focus} \u2192 next focus</button>}
+        {onPlan && <button className="ghost" onClick={() => requestFinish('skipped')}>Skip {plan.focus} \u2192 next focus</button>}
         {!swapping && <button className="ghost" onClick={() => setSwapping(true)}>Can't get to the gym?</button>}
       </div>
 
@@ -325,6 +367,16 @@ export default function Today({ data, setData, prefs }: Props) {
             <Picker movements={data.movements} focus={plan.focus} onPick={pick} />
           </div>
         </div>
+      )}
+
+      {finish && (
+        <FinishSheet
+          stats={finish.stats}
+          focus={finish.session.focus}
+          type={finish.session.type}
+          onCancel={() => setFinish(null)}
+          onConfirm={() => commitSession(finish.session)}
+        />
       )}
     </section>
   );
