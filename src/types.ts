@@ -67,6 +67,8 @@ export interface LoggedMovement {
   notes?: string;
   /** Explicitly finished by the user. Collapses the card and moves it down. */
   finished?: boolean;
+  /** When the first set of this movement was completed. Used to order the saved log. */
+  performedAt?: string;
 }
 
 export interface Session {
