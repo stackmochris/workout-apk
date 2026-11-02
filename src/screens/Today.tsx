@@ -22,6 +22,30 @@ import { computeSessionStats, SessionStats } from '../engine/sessionStats';
 import { displayTarget } from '../engine/prescription';
 import { Goal, Prescription } from '../types';
 
+
+const CARDIO = /zoned cardio|hike|walk|run|stairs|jump rope|cardio/i;
+function isCardio(name: string) { return CARDIO.test(name); }
+function metFor(name: string): number {
+  const n = name.toLowerCase();
+  if (n.includes('hard') || n.includes('run')) return 9.5;
+  if (n.includes('moderate')) return 6.5;
+  if (n.includes('easy') || n.includes('walk') || n.includes('hike')) return 4.0;
+  if (n.includes('stair')) return 8.0;
+  return 5.0;
+}
+function paceLabel(min: number | undefined, km: number | undefined): string | null {
+  if (!min || !km || km <= 0) return null;
+  const total = min / km;
+  const m = Math.floor(total);
+  const sec = Math.round((total - m) * 60);
+  return `${m}:${String(sec).padStart(2, '0')} /km`;
+}
+function kcalLabel(name: string, min: number | undefined, kg: number): string | null {
+  if (!min || min <= 0) return null;
+  const kcal = Math.round(metFor(name) * kg * (min / 60));
+  return `~${kcal} kcal`;
+}
+
 type Props = { data: AppData; setData: React.Dispatch<React.SetStateAction<AppData>>; prefs?: UserPrefs };
 
 function blank(m: Movement): LoggedMovement {
@@ -72,14 +96,14 @@ export default function Today({ data, setData, prefs }: Props) {
       if (!last) return;
       const idle = Date.now() - new Date(last).getTime();
       const open = d.startedAt ? Date.now() - new Date(d.startedAt).getTime() : idle;
-      const hasWork = d.movements.some((m) => m.finished || m.sets.some((s) => s.done));
+      const hasWork = d.movements.some((m) => m.finished || m.durationMin || m.distanceKm || m.sets.some((s) => s.done));
       if (!hasWork && open > 36 * 3600_000) {
         setData((cur) => ({ ...cur, draft: null }));
         return;
       }
       if (hasWork && (idle > 3 * 3600_000 || open > 36 * 3600_000)) {
         const now = new Date().toISOString();
-        const ordered = byPerformed(d.movements.filter((m) => m.finished || m.sets.some((s) => s.done)));
+        const ordered = byPerformed(d.movements.filter((m) => m.finished || m.durationMin || m.distanceKm || m.sets.some((s) => s.done)));
         const session: Session = {
           id: uid(), date: now, focus: d.focus as Focus, type: d.type as SessionType, status: 'completed',
           movements: ordered, author: 'app', updatedAt: now,
@@ -106,6 +130,11 @@ export default function Today({ data, setData, prefs }: Props) {
   
   const setMovementNotes = (mi: number, notes: string) =>
     saveDraft(draft.movements.map((m, i) => i === mi ? { ...m, notes: notes || undefined } : m));
+
+  const setCardio = (mi: number, patch: { durationMin?: number; distanceKm?: number }) => {
+    const now = new Date().toISOString();
+    saveDraft(draft.movements.map((m, i) => i === mi ? { ...m, ...patch, performedAt: m.performedAt ?? now } : m));
+  };
 
   const finishMovement = (mi: number) => {
     saveDraft(draft.movements.map((m, i) => i === mi ? { ...m, finished: true } : m));
@@ -199,7 +228,7 @@ export default function Today({ data, setData, prefs }: Props) {
     const now = new Date().toISOString();
     const session: Session = {
       id: uid(), date: now, focus: plan.focus, type: plan.type, status,
-      movements: status === 'completed' ? byPerformed(draft.movements.filter((m) => m.finished || m.sets.some((s) => s.done) || extra.gvtRepsPerMinute)) : [],
+      movements: status === 'completed' ? byPerformed(draft.movements.filter((m) => m.finished || m.durationMin || m.distanceKm || m.sets.some((s) => s.done) || extra.gvtRepsPerMinute)) : [],
       author: 'app', updatedAt: now,
       durationMin: draft.startedAt ? Math.max(1, Math.round((Date.now() - new Date(draft.startedAt).getTime()) / 60000)) : undefined,
       ...extra,
@@ -246,7 +275,8 @@ export default function Today({ data, setData, prefs }: Props) {
   const fatigue = useMemo(() => muscleFatigue(data.sessions, data.movements), [data.sessions, data.movements]);
   const tired = recoveryHint(plan.focus, fatigue);
   const label = (id: string) => MUSCLES.find((m) => m.id === id)?.label ?? id;
-  const doneCount = draft.movements.filter((m) => m.finished || (m.sets.length && m.sets.every((s) => s.done))).length;
+  const doneCount = draft.movements.filter((m) => m.finished || m.durationMin || m.distanceKm || (m.sets.length && m.sets.every((s) => s.done))).length;
+  const bodyKg = [...data.body].reverse().find((b) => b.weight)?.weight ?? 80;
 
   return (
     <section>
@@ -412,6 +442,28 @@ export default function Today({ data, setData, prefs }: Props) {
                   </p>
                 )}
                 {flagged && mv!.flags.map((f) => <p key={f} className="flag">\u26a0 {FLAG_INFO[f]?.reminder ?? f}</p>)}
+                {isCardio(lm.name) ? (
+                  <div className="cardio-inputs" style={{ margin: '8px 0' }}>
+                    <div className="row" style={{ gap: 8 }}>
+                      <label className="form" style={{ flex: 1 }}>
+                        Time (min)
+                        <input type="number" inputMode="decimal" value={lm.durationMin ?? ''} placeholder="e.g. 30"
+                          onChange={(e) => setCardio(mi, { durationMin: e.target.value ? Number(e.target.value) : undefined })} />
+                      </label>
+                      <label className="form" style={{ flex: 1 }}>
+                        Distance (km)
+                        <input type="number" inputMode="decimal" step="0.1" value={lm.distanceKm ?? ''} placeholder="e.g. 5"
+                          onChange={(e) => setCardio(mi, { distanceKm: e.target.value ? Number(e.target.value) : undefined })} />
+                      </label>
+                    </div>
+                    <p className="muted" style={{ marginTop: 6 }}>
+                      {paceLabel(lm.durationMin, lm.distanceKm) ?? 'Avg pace —'}
+                      {' · '}
+                      {kcalLabel(lm.name, lm.durationMin, bodyKg) ?? 'Calories —'}
+                      {bodyKg !== 80 ? ` (at ${bodyKg} kg)` : ' (est. at 80 kg)'}
+                    </p>
+                  </div>
+                ) : (
                 <div className="sets">
                   <div className="sets-h"><span>Set</span><span>kg</span><span>Reps</span><span /></div>
                   {lm.sets.map((s, si) => {
@@ -432,6 +484,7 @@ export default function Today({ data, setData, prefs }: Props) {
                     );
                   })}
                 </div>
+                )}
                 <div className="mv-foot">
                   <span className="muted">{prev ? `Last: ${prev.sets.filter((x) => x.done).map((x) => `${x.weight ?? '\u2013'}\u00d7${x.reps ?? '\u2013'}`).join(', ')}` : 'No previous session'}</span>
                   <span>
