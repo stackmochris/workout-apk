@@ -5,6 +5,7 @@ import { listSnapshots, parseBackup, readSnapshot } from '../lib/backup';
 import { notificationsSupported, requestNotifications } from '../lib/alerts';
 import { plateLabel, plateLoad } from '../engine/plates';
 import { Theme, Goal } from '../types';
+import type { CardioGoal } from '../types';
 
 type Props = { data: AppData; setData: React.Dispatch<React.SetStateAction<AppData>> };
 
@@ -79,6 +80,17 @@ export default function SettingsScreen({ data, setData }: Props) {
         </div>
       </div>
       <div className="card form">
+        
+      <div className="card form">
+        <h3>Cardio priority</h3>
+        <p className="muted">What the cardio cards should emphasise.</p>
+        <div className="chips">
+          {([['maintenance','Maintenance'],['calories','Calorie burn'],['pace','Pace'],['distance','Distance'],['time','Time']] as [CardioGoal, string][]).map(([id, label]) => (
+            <button key={id} className={`chip ${s.cardioGoal === id ? 'on' : ''}`} onClick={() => set({ cardioGoal: id })}>{label}</button>
+          ))}
+        </div>
+      </div>
+
         <h3>Timers</h3>
         <label>Rest (seconds)<input inputMode="numeric" value={s.restSeconds} onChange={(e) => set({ restSeconds: num(e.target.value, 90) })} /></label>
         <label>GVT sets<input inputMode="numeric" value={s.gvt.sets} onChange={(e) => set({ gvt: { ...s.gvt, sets: num(e.target.value, 10) } })} /></label>
