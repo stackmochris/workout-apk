@@ -375,6 +375,12 @@ export default function Today({ data, setData, prefs }: Props) {
               </article>
             );
           })}
+          {draft.movements.length === 0 && (
+            <div className="card" style={{ textAlign: 'center', padding: '24px 16px' }}>
+              <h3 style={{ margin: '0 0 6px' }}>Freestyle</h3>
+              <p className="muted">No movements yet. Add what you want to do today.</p>
+            </div>
+          )}
           <button className="ghost wide" onClick={() => setPicker({ mode: 'add' })}>+ Add movement</button>
           <button className="primary wide" onClick={() => requestFinish('completed')}>Finish session</button>
         </>
