@@ -1,9 +1,9 @@
-import { FOCI, Focus, RotationState, SessionType } from '../types';
+import { ROTATION_FOCI, Focus, RotationState, SessionType } from '../types';
 
 /** Each focus cycles Normal → Normal → GVT, then resets. */
 export const CYCLE: SessionType[] = ['Normal', 'Normal', 'GVT'];
 
-export function initialRotation(order: Focus[] = FOCI): RotationState {
+export function initialRotation(order: Focus[] = ROTATION_FOCI): RotationState {
   const counters = Object.fromEntries(order.map((f) => [f, 0])) as Record<Focus, number>;
   return { order: [...order], nextIndex: 0, counters };
 }
@@ -17,7 +17,7 @@ export interface PlannedSession {
 
 export function currentPlan(state: RotationState): PlannedSession {
   const focus = state.order[state.nextIndex % state.order.length];
-  const c = state.counters[focus] % CYCLE.length;
+  const c = (state.counters[focus] ?? 0) % CYCLE.length;
   return { focus, type: CYCLE[c], cycleStep: c + 1 };
 }
 
@@ -38,7 +38,7 @@ export function completeSession(state: RotationState): RotationState {
   return {
     ...state,
     nextIndex: (state.nextIndex + 1) % state.order.length,
-    counters: { ...state.counters, [focus]: (state.counters[focus] + 1) % CYCLE.length },
+    counters: { ...state.counters, [focus]: ((state.counters[focus] ?? 0) + 1) % CYCLE.length },
   };
 }
 
