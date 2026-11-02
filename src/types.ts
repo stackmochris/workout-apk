@@ -41,6 +41,10 @@ export interface SetEntry {
   weight: number | null;
   done: boolean;
   kind?: SetKind;
+  /** Drop sets: starting weight of the drop. */
+  dropStart?: number | null;
+  /** Drop sets: finishing weight of the drop. */
+  dropEnd?: number | null;
 }
 
 export interface LoggedMovement {
