@@ -76,6 +76,15 @@ export default function Today({ data, setData, prefs }: Props) {
   const setMovementNotes = (mi: number, notes: string) =>
     saveDraft(draft.movements.map((m, i) => i === mi ? { ...m, notes: notes || undefined } : m));
 
+  const finishMovement = (mi: number) => {
+    saveDraft(draft.movements.map((m, i) => i === mi ? { ...m, finished: true } : m));
+    setCollapsed((c) => ({ ...c, [mi]: true }));
+  };
+  const reopenMovement = (mi: number) => {
+    saveDraft(draft.movements.map((m, i) => i === mi ? { ...m, finished: false } : m));
+    setCollapsed((c) => ({ ...c, [mi]: false }));
+  };
+
   const savePrescription = (id: string, patch: Prescription) => {
     setData((d) => ({
       ...d,
@@ -189,7 +198,7 @@ export default function Today({ data, setData, prefs }: Props) {
   const fatigue = useMemo(() => muscleFatigue(data.sessions, data.movements), [data.sessions, data.movements]);
   const tired = recoveryHint(plan.focus, fatigue);
   const label = (id: string) => MUSCLES.find((m) => m.id === id)?.label ?? id;
-  const doneCount = draft.movements.filter((m) => m.sets.length && m.sets.every((s) => s.done)).length;
+  const doneCount = draft.movements.filter((m) => m.finished || (m.sets.length && m.sets.every((s) => s.done))).length;
 
   return (
     <section>
@@ -308,13 +317,13 @@ export default function Today({ data, setData, prefs }: Props) {
       ) : (
         <>
           {(() => {
-          const indexed = draft.movements.map((lm, mi) => ({ lm, mi, complete: lm.sets.length > 0 && lm.sets.every((s) => s.done) }));
+          const indexed = draft.movements.map((lm, mi) => ({ lm, mi, complete: !!lm.finished || (lm.sets.length > 0 && lm.sets.every((s) => s.done)) }));
           const ordered = [...indexed.filter((x) => !x.complete), ...indexed.filter((x) => x.complete)];
           return ordered.map(({ lm, mi, complete }) => {
             const mv = byId.get(lm.movementId);
             const prev = previousFor(data.sessions, lm.movementId);
             const flagged = !!mv?.flags.length;
-            const complete = lm.sets.length > 0 && lm.sets.every((s) => s.done);
+            const complete = !!lm.finished || (lm.sets.length > 0 && lm.sets.every((s) => s.done));
             const active = !complete && lm.sets.some((s) => s.done || s.reps != null || s.weight != null);
             const sug = mv ? suggestNext(mv, prev?.sets, { bar: data.settings.barKg, plates: data.settings.plates, extraReps: pen.elbowReps }) : { weight: null, reps: null, reason: 'none' as const };
             const sugP = penalisedHint(mv, { weight: sug.weight, reps: sug.reps }, penalty.multiplier, pen);
@@ -380,6 +389,9 @@ export default function Today({ data, setData, prefs }: Props) {
                       <button className="ghost" onClick={() => toggleSuperset(mi)}>{lm.superset ? 'Unlink' : 'Superset \u2193'}</button>
                     )}
                     <button className="ghost" onClick={() => saveDraft(draft.movements.filter((_, i) => i !== mi))}>Remove</button>
+                    {complete
+                      ? <button className="ghost" onClick={() => reopenMovement(mi)}>Reopen</button>
+                      : <button className="primary" onClick={() => finishMovement(mi)}>Finish movement</button>}
                   <input className="notes" placeholder="Notes" value={lm.notes ?? ''} onChange={(e) => setMovementNotes(mi, e.target.value)} style={{ marginTop: 8, width: '100%' }} />
                   </span>
                 </div>
