@@ -323,7 +323,6 @@ export default function Today({ data, setData, prefs }: Props) {
             const mv = byId.get(lm.movementId);
             const prev = previousFor(data.sessions, lm.movementId);
             const flagged = !!mv?.flags.length;
-            const complete = !!lm.finished || (lm.sets.length > 0 && lm.sets.every((s) => s.done));
             const active = !complete && lm.sets.some((s) => s.done || s.reps != null || s.weight != null);
             const sug = mv ? suggestNext(mv, prev?.sets, { bar: data.settings.barKg, plates: data.settings.plates, extraReps: pen.elbowReps }) : { weight: null, reps: null, reason: 'none' as const };
             const sugP = penalisedHint(mv, { weight: sug.weight, reps: sug.reps }, penalty.multiplier, pen);
