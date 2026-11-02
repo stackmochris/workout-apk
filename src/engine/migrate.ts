@@ -10,7 +10,7 @@ export interface AppData {
   movements: Movement[];
   rotation: RotationState;
   sessions: Session[];
-  draft: { focus: string; type: string; movements: LoggedMovement[]; gvtRepsPerMinute?: number[]; startedAt?: string } | null;
+  draft: { focus: string; type: string; movements: LoggedMovement[]; gvtRepsPerMinute?: number[]; startedAt?: string; lastInputAt?: string } | null;
   settings: Settings;
   body: BodyEntry[];
 }
