@@ -93,6 +93,7 @@ const seeds: Record<Movement['focus'], Seed[]> = {
     ['GHD sit-up', 3, 10, 15, 'machine'],
     ['Rope climb', 3, 1, 3, 'bodyweight', 'Or lying rope pulls'],
   ],
+  Freestyle: [],
 };
 
 const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
@@ -119,7 +120,7 @@ export const FLAG_INFO: Record<string, { label: string; reminder: string }> = {
   },
 };
 
-/** Default day templates: first N movements of each focus. Editable per day via add/swap. */
+/** Default day templates: first N movements of each focus. Freestyle starts empty. */
 export const DEFAULT_DAY: Record<string, string[]> = {
   Chest: ['barbell-bench-press-top-set-back-off', 'incline-db-press', 'deep-cable-crossover-cable-fly', 'dips'],
   Shoulder: ['db-lateral-raise', 'rear-delt-fly-db-cable', 'face-pull', 'machine-overhead-press'],
@@ -128,6 +129,7 @@ export const DEFAULT_DAY: Record<string, string[]> = {
   Leg: ['barbell-rdl-db-rdl', 'leg-press-or-hack', 'leg-curl', 'calf-raise'],
   HIIT: ['burpee-intervals', 'mountain-climbers', 'kettlebell-swings', 'sprint-intervals'],
   Crossfit: ['thruster', 'wall-ball', 'pull-up-kipping-or-strict', 'double-unders'],
+  Freestyle: [],
 };
 
 /** 100-rep bodyweight swap defaults (brief §5.13), used in M2. */
@@ -139,4 +141,5 @@ export const SWAP_DEFAULTS: Record<string, { name: string; alt?: string }> = {
   Arm: { name: '100 bench / chair dips', alt: '100 diamond push-ups (elbow-friendly)' },
   HIIT: { name: '20 min EMOM (burpees / squats)' },
   Crossfit: { name: '20 min AMRAP (thrusters / pull-ups)' },
+  Freestyle: { name: 'Free session' },
 };
