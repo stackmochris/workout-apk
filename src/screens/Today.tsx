@@ -199,7 +199,7 @@ export default function Today({ data, setData, prefs }: Props) {
         </div>
         <div className="browse">
           <select aria-label="Browse focus" value={plan.focus} onChange={(e) => { setGvtPicks(null); setGvtRun(null); const f = e.target.value as Focus; setBrowse(f === planned.focus && plan.type === planned.type ? null : { focus: f, type: plan.type }); }}>
-            {FOCI.map((f) => <option key={f} value={f}>{f}</option>)}
+            {FOCI.map((f) => <option key={f} value={f}>{f === 'NoGym' ? 'No Gym' : f}</option>)}
           </select>
           {(['Normal', 'GVT'] as SessionType[]).map((t) => (
             <button key={t} className={`chip ${plan.type === t ? 'on' : ''}`} onClick={() => { setGvtPicks(null); setGvtRun(null); setBrowse(plan.focus === planned.focus && t === planned.type ? null : { focus: plan.focus, type: t }); }}>{t}</button>
@@ -387,7 +387,7 @@ export default function Today({ data, setData, prefs }: Props) {
       )}
       <div className="row center">
         {onPlan && <button className="ghost" onClick={() => requestFinish('skipped')}>Skip {plan.focus} \u2192 next focus</button>}
-        {!swapping && <button className="ghost" onClick={() => setSwapping(true)}>Can't get to the gym?</button>}
+        
       </div>
 
       <RestTimer cue={rest} sound={data.settings.sound} vibrate={data.settings.vibrate} />
