@@ -13,7 +13,8 @@ const THEMES: { id: Theme; label: string }[] = [
   { id: 'red', label: 'Red spectrum' },
   { id: 'blue', label: 'Blue spectrum' },
   { id: 'gold', label: 'Gold spectrum' },
-  { id: 'templar', label: 'Red Knight\'s Templar Cross on White' },
+  { id: 'templar', label: 'Templar Cross' },
+  { id: 'jerusalem', label: 'Jerusalem Cross' },
   { id: 'union-jack', label: 'Union Jack' },
   { id: 'confederate', label: 'Confederate Flag' },
   { id: 'pride', label: 'Pride Flag' },
@@ -108,11 +109,11 @@ export default function SettingsScreen({ data, setData }: Props) {
       </div>
       <div className="card form">
         <h3>Rotation</h3>
-        <p className="muted">Counters: {Object.entries(data.rotation.counters).map(([f, c]) => `${f} ${c + 1}/3`).join(' · ')}</p>
+        <p className="muted">Counters: {Object.entries(data.rotation.counters).map(([f, c]) => `${f} ${c + 1}/3`).join(' \u00b7 ')}</p>
       </div>
       <div className="card form">
         <h3>Data</h3>
-        <p className="muted">{data.sessions.length} sessions · {data.movements.length} movements · stored on this device</p>
+        <p className="muted">{data.sessions.length} sessions \u00b7 {data.movements.length} movements \u00b7 stored on this device</p>
         <button className="primary wide" onClick={() => exportJson(data)}>Export JSON (full backup)</button>
         <button className="ghost wide" onClick={() => exportCsv(data)}>Export CSV (sets and body stats)</button>
         <label className="ghost wide file">Restore from JSON file<input type="file" accept="application/json,.json" onChange={(e) => { void importFile(e.target.files?.[0]); e.target.value = ''; }} /></label>
@@ -121,7 +122,7 @@ export default function SettingsScreen({ data, setData }: Props) {
         <p className="muted small">A copy is saved on this device once a day, last 7 days kept.</p>
         {snaps.length ? snaps.map((sn) => (
           <p key={sn.key} className="hist-line">
-            <span>{sn.day} · {sn.sessions} sessions</span>
+            <span>{sn.day} \u00b7 {sn.sessions} sessions</span>
             <button className="ghost" onClick={() => { const d = readSnapshot(sn.key); if (d) restore(d, `the ${sn.day} backup`); }}>Restore</button>
           </p>
         )) : <p className="muted small">None yet. The first one is saved after you log something.</p>}
