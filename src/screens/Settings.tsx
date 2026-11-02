@@ -4,7 +4,7 @@ import { AppData, exportCsv, exportJson, freshData } from '../lib/store';
 import { listSnapshots, parseBackup, readSnapshot } from '../lib/backup';
 import { notificationsSupported, requestNotifications } from '../lib/alerts';
 import { plateLabel, plateLoad } from '../engine/plates';
-import { Theme } from '../types';
+import { Theme, Goal } from '../types';
 
 type Props = { data: AppData; setData: React.Dispatch<React.SetStateAction<AppData>> };
 
@@ -18,6 +18,13 @@ const THEMES: { id: Theme; label: string }[] = [
   { id: 'union-jack', label: 'Union Jack' },
   { id: 'confederate', label: 'Confederate Flag' },
   { id: 'pride', label: 'Pride Flag' },
+];
+
+const GOALS: { id: Goal; label: string }[] = [
+  { id: 'strength', label: 'Strength' },
+  { id: 'hypertrophy', label: 'Hypertrophy' },
+  { id: 'endurance', label: 'Endurance' },
+  { id: 'mixed', label: 'Mixed (use defaults)' },
 ];
 
 export default function SettingsScreen({ data, setData }: Props) {
@@ -56,6 +63,17 @@ export default function SettingsScreen({ data, setData }: Props) {
           {THEMES.map((t) => (
             <button key={t.id} className={`chip ${s.theme === t.id ? 'on' : ''}`} onClick={() => set({ theme: t.id })}>
               {t.label}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="card form">
+        <h3>Training goal</h3>
+        <p className="muted small">Drives the set/rep sub-heading on each movement. Tap a movement's sub-heading on Today to override it for you.</p>
+        <div className="chips">
+          {GOALS.map((g) => (
+            <button key={g.id} className={`chip ${s.goal === g.id ? 'on' : ''}`} onClick={() => set({ goal: g.id })}>
+              {g.label}
             </button>
           ))}
         </div>
