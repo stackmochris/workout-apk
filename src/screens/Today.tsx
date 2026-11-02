@@ -42,6 +42,7 @@ export default function Today({ data, setData, prefs }: Props) {
   const [swapping, setSwapping] = useState(false);
   const [finish, setFinish] = useState<{ session: Session; stats: SessionStats } | null>(null);
   const [editing, setEditing] = useState<string | null>(null);
+  const [collapsed, setCollapsed] = useState<Record<number, boolean>>({});
   const [tick, setTick] = useState(0);
   const pen = data.settings.penalty;
   const penalty = useMemo(
@@ -71,6 +72,10 @@ export default function Today({ data, setData, prefs }: Props) {
 
   const saveDraft = (movements: LoggedMovement[], extra: Partial<NonNullable<AppData['draft']>> = {}) =>
     setData((d) => ({ ...d, draft: { ...draft, movements, ...extra } }));
+  
+  const setMovementNotes = (mi: number, notes: string) =>
+    saveDraft(draft.movements.map((m, i) => i === mi ? { ...m, notes: notes || undefined } : m));
+
   const savePrescription = (id: string, patch: Prescription) => {
     setData((d) => ({
       ...d,
@@ -302,7 +307,10 @@ export default function Today({ data, setData, prefs }: Props) {
         </div>
       ) : (
         <>
-          {draft.movements.map((lm, mi) => {
+          {(() => {
+          const indexed = draft.movements.map((lm, mi) => ({ lm, mi, complete: lm.sets.length > 0 && lm.sets.every((s) => s.done) }));
+          const ordered = [...indexed.filter((x) => !x.complete), ...indexed.filter((x) => x.complete)];
+          return ordered.map(({ lm, mi, complete }) => {
             const mv = byId.get(lm.movementId);
             const prev = previousFor(data.sessions, lm.movementId);
             const flagged = !!mv?.flags.length;
@@ -314,13 +322,15 @@ export default function Today({ data, setData, prefs }: Props) {
             return (
               <article key={mi} className={`card mv ${complete ? 'complete' : active ? 'active' : ''} ${flagged ? 'flagged' : ''} ${lm.superset ? 'superset' : ''}`}>
                 {lm.superset && <span className="ss-tag">Superset {String.fromCharCode(65 + ssIndex)}</span>}
-                <div className="mv-head">
+                <div className="mv-head" onClick={() => complete && setCollapsed((c) => ({ ...c, [mi]: !c[mi] }))} style={complete ? { cursor: 'pointer' } : undefined}>
                   <div>
-                    <h3>{lm.name}</h3>
+                    <h3>{lm.name}{complete ? (collapsed[mi] === false ? ' ▾' : ' ▸') : ''}</h3>
                     <small>{mv?.target}{mv?.notes ? ` \u00b7 ${mv.notes}` : ''}</small>
                   </div>
-                  <button className="ghost" onClick={() => setPicker({ mode: 'swap', index: mi })}>Swap</button>
+                  <button className="ghost" onClick={(e) => { e.stopPropagation(); setPicker({ mode: 'swap', index: mi }); }}>Swap</button>
                 </div>
+                {complete && collapsed[mi] !== false ? null : (
+                <>
                 {mv && editing === mv.id && (
                   <div className="row" style={{ margin: '8px 0', gap: 6 }}>
                     <input style={{ width: 60 }} inputMode="numeric" placeholder="sets" defaultValue={data.settings.prescriptions?.[mv.id]?.sets ?? mv.sets}
@@ -370,11 +380,15 @@ export default function Today({ data, setData, prefs }: Props) {
                       <button className="ghost" onClick={() => toggleSuperset(mi)}>{lm.superset ? 'Unlink' : 'Superset \u2193'}</button>
                     )}
                     <button className="ghost" onClick={() => saveDraft(draft.movements.filter((_, i) => i !== mi))}>Remove</button>
+                  <input className="notes" placeholder="Notes" value={lm.notes ?? ''} onChange={(e) => setMovementNotes(mi, e.target.value)} style={{ marginTop: 8, width: '100%' }} />
                   </span>
                 </div>
+                </>
+                )}
               </article>
             );
-          })}
+          });
+          })()}
           {draft.movements.length === 0 && (
             <div className="card" style={{ textAlign: 'center', padding: '24px 16px' }}>
               <h3 style={{ margin: '0 0 6px' }}>Freestyle</h3>
@@ -415,17 +429,32 @@ export default function Today({ data, setData, prefs }: Props) {
 }
 
 function Picker({ movements, focus, onPick }: { movements: Movement[]; focus: string; onPick: (m: Movement) => void }) {
-  const [all, setAll] = useState(false);
+  const cats = ['Chest', 'Shoulder', 'Back', 'Arm', 'Leg', 'HIIT', 'Crossfit', 'NoGym', 'Conditioning'];
+  const [cat, setCat] = useState<string>(focus);
+  const [open, setOpen] = useState(false);
   const [q, setQ] = useState('');
-  const list = movements.filter((m) => (all || m.focus === focus) && m.name.toLowerCase().includes(q.toLowerCase()));
+  const list = movements.filter((m) => (cat === 'All' || m.focus === cat) && m.name.toLowerCase().includes(q.toLowerCase()));
+  const label = cat === 'NoGym' ? 'No Gym' : cat;
   return (
     <>
       <div className="row">
         <input className="search" placeholder="Search" value={q} onChange={(e) => setQ(e.target.value)} />
-        <button className={`chip ${all ? 'on' : ''}`} onClick={() => setAll((v) => !v)}>{all ? 'All' : focus}</button>
+        <div style={{ position: 'relative' }}>
+          <button className="chip on" onClick={() => setOpen((v) => !v)}>{label} ▾</button>
+          {open && (
+            <div className="card" style={{ position: 'absolute', right: 0, top: '110%', zIndex: 5, padding: 8, minWidth: 140 }}>
+              <button className="ghost wide" onClick={() => { setCat('All'); setOpen(false); }}>All</button>
+              {cats.map((c) => (
+                <button key={c} className={`ghost wide ${cat === c ? 'on' : ''}`} onClick={() => { setCat(c); setOpen(false); }}>
+                  {c === 'NoGym' ? 'No Gym' : c}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
       <ul className="pick">
-        {list.map((m) => <li key={m.id}><button onClick={() => onPick(m)}>{m.name}<small>{m.focus} \u00b7 {m.target}</small></button></li>)}
+        {list.map((m) => <li key={m.id}><button onClick={() => onPick(m)}>{m.name}<small>{m.focus} · {m.target}</small></button></li>)}
         {!list.length && <li className="muted pad">Nothing matches.</li>}
       </ul>
     </>
