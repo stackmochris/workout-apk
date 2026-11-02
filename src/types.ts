@@ -65,6 +65,8 @@ export interface LoggedMovement {
   superset?: string;
   /** Free-text notes for this movement in this session. */
   notes?: string;
+  /** Explicitly finished by the user. Collapses the card and moves it down. */
+  finished?: boolean;
 }
 
 export interface Session {
