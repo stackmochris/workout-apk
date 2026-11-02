@@ -6,7 +6,7 @@ import { AppData, previousFor, uid } from '../lib/store';
 import { LoggedMovement, Movement, Session, SetKind, UserPrefs } from '../types';
 import RestTimer, { RestCue } from '../components/RestTimer';
 import SetRow from '../components/SetRow';
-import { suggestNext } from '../engine/progression';
+import { suggestNext, suggestDrop } from '../engine/progression';
 import { plateLabel, plateLoad } from '../engine/plates';
 import { muscleFatigue, recoveryHint } from '../engine/analytics';
 import { MUSCLES } from '../data/muscles';
@@ -53,7 +53,7 @@ export default function Today({ data, setData, prefs }: Props) {
 
   const saveDraft = (movements: LoggedMovement[]) => setData((d) => ({ ...d, draft: { ...draft, movements } }));
 
-  const updateSet = (mi: number, si: number, patch: { reps?: number | null; weight?: number | null }) => {
+  const updateSet = (mi: number, si: number, patch: { reps?: number | null; weight?: number | null; dropStart?: number | null; dropEnd?: number | null }) => {
     const was = draft.movements[mi].sets[si].done;
     const updated = editSet(draft.movements[mi].sets[si], patch);
     const movements = draft.movements.map((m, i) =>
@@ -280,11 +280,17 @@ export default function Today({ data, setData, prefs }: Props) {
                     const prevSet = prev?.sets[si];
                     const base = (s.kind ?? 'working') !== 'working' || sug.reason === 'none' ? prevSet : { weight: sug.weight, reps: sug.reps };
                     const p = base ? penalisedHint(mv, base, penalty.multiplier, pen) : { weight: null, reps: (s.kind ?? 'working') === 'working' ? mv?.repMin ?? null : null };
+                    const dropHint = s.kind === 'drop' ? suggestDrop(prevSet, s.dropStart ?? s.weight) : null;
                     return (
-                      <SetRow key={si} index={si} s={s} hint={p}
-                        onEdit={(patch) => updateSet(mi, si, patch)}
-                        onKind={(k) => setKind(mi, si, k)}
-                        onTick={() => updateSet(mi, si, s.done ? { reps: null } : { reps: s.reps ?? p.reps ?? null, weight: s.weight ?? p.weight ?? null })} />
+                      <>
+                        <SetRow key={si} index={si} s={s} hint={p}
+                          onEdit={(patch) => updateSet(mi, si, patch)}
+                          onKind={(k) => setKind(mi, si, k)}
+                          onTick={() => updateSet(mi, si, s.done ? { reps: null } : { reps: s.reps ?? p.reps ?? null, weight: s.weight ?? p.weight ?? null })} />
+                        {dropHint?.end != null && s.dropEnd == null && (
+                          <p className="muted small" style={{ margin: '2px 0 6px 44px' }}>Drop to ~{dropHint.end} kg{dropHint.dropKg ? ` (\u2212${dropHint.dropKg} kg)` : ''}</p>
+                        )}
+                      </>
                     );
                   })}
                 </div>
