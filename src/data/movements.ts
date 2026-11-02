@@ -94,6 +94,22 @@ const seeds: Record<Movement['focus'], Seed[]> = {
     ['Rope climb', 3, 1, 3, 'bodyweight', 'Or lying rope pulls'],
   ],
   Freestyle: [],
+  NoGym: [
+    ['Zoned cardio (easy)', 1, null, null, 'bodyweight', 'Zone 2, conversational pace'],
+    ['Zoned cardio (moderate)', 1, null, null, 'bodyweight', 'Zone 3, steady'],
+    ['Zoned cardio (hard)', 1, null, null, 'bodyweight', 'Zone 4–5 intervals'],
+    ['Scenic hike', 1, null, null, 'bodyweight', 'Note distance and elevation'],
+    ['Walk', 1, null, null, 'bodyweight', 'Any pace'],
+    ['Run', 1, null, null, 'bodyweight', 'Easy or tempo'],
+    ['Burpees', 4, 8, 15, 'bodyweight', 'Full or half'],
+    ['Push-ups', 4, 10, 20, 'bodyweight'],
+    ['Bodyweight squats', 4, 15, 25, 'bodyweight'],
+    ['Lunges', 3, 10, 15, 'bodyweight', 'Per leg'],
+    ['Stairs', 1, null, null, 'bodyweight', 'Flights or minutes'],
+    ['Jump rope', 5, 30, 60, 'bodyweight', 'Seconds or reps'],
+    ['Plank', 3, null, null, 'bodyweight', 'Hold time'],
+    ['Mobility / stretch', 1, null, null, 'bodyweight', 'Note what you worked'],
+  ],
 };
 
 const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
@@ -120,7 +136,7 @@ export const FLAG_INFO: Record<string, { label: string; reminder: string }> = {
   },
 };
 
-/** Default day templates: first N movements of each focus. Freestyle starts empty. */
+/** Default day templates. Freestyle starts empty. NoGym starts with a few activities. */
 export const DEFAULT_DAY: Record<string, string[]> = {
   Chest: ['barbell-bench-press-top-set-back-off', 'incline-db-press', 'deep-cable-crossover-cable-fly', 'dips'],
   Shoulder: ['db-lateral-raise', 'rear-delt-fly-db-cable', 'face-pull', 'machine-overhead-press'],
@@ -130,6 +146,7 @@ export const DEFAULT_DAY: Record<string, string[]> = {
   HIIT: ['burpee-intervals', 'mountain-climbers', 'kettlebell-swings', 'sprint-intervals'],
   Crossfit: ['thruster', 'wall-ball', 'pull-up-kipping-or-strict', 'double-unders'],
   Freestyle: [],
+  NoGym: ['zoned-cardio-easy', 'scenic-hike', 'burpees', 'push-ups'],
 };
 
 /** 100-rep bodyweight swap defaults (brief §5.13), used in M2. */
@@ -142,4 +159,5 @@ export const SWAP_DEFAULTS: Record<string, { name: string; alt?: string }> = {
   HIIT: { name: '20 min EMOM (burpees / squats)' },
   Crossfit: { name: '20 min AMRAP (thrusters / pull-ups)' },
   Freestyle: { name: 'Free session' },
+  NoGym: { name: 'No-gym session' },
 };
