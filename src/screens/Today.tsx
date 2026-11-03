@@ -214,8 +214,8 @@ export default function Today({ data, setData, prefs }: Props) {
       const partner = group[(pos + 1) % group.length].m;
       const partnerPending = partner.sets[si] && !partner.sets[si].done;
       setRest((r) => partnerPending
-        ? { n: r.n + 1, seconds: data.settings.supersetRest, label: `\u2192 ${short(partner.name)}` }
-        : { n: r.n + 1, seconds: full, label: `Rest \u2192 ${short(group[0].m.name)}` });
+        ? { n: r.n + 1, seconds: data.settings.supersetRest, label: `→ ${short(partner.name)}` }
+        : { n: r.n + 1, seconds: full, label: `Rest → ${short(group[0].m.name)}` });
       return;
     }
     setRest((r) => ({ n: r.n + 1, seconds: full, label: 'Rest' }));
@@ -308,7 +308,7 @@ export default function Today({ data, setData, prefs }: Props) {
   return (
     <section>
       <header className={`hero ${plan.type === 'GVT' ? 'gvt-day' : ''}`}>
-        <small>{onPlan ? 'Today' : 'Browsing'}</small>
+        <small>{onPlan ? 'Today' : 'Browsing'}{data.settings.displayName ? ` · ${data.settings.displayName}` : ''}</small>
         <h1>{plan.focus === 'NoGym' ? 'No Gym' : plan.focus}</h1>
         <div className="pills">
           <span className={`pill ${plan.type}`}>{plan.type}</span>
@@ -330,7 +330,7 @@ export default function Today({ data, setData, prefs }: Props) {
         </div>
         {!onPlan && <p className="muted small">Browsing. Logging this won't move the rotation.</p>}
         {tired.length > 0 && <p className="recovery">Probably still recovering: {tired.map(label).join(', ')}. Go lighter on those or pick another focus.</p>}
-        <p className="next">Up next: {next.map((n) => `${n.focus} \u00b7 ${n.type}`).join('  \u2192  ')}</p>
+        <p className="next">Up next: {next.map((n) => `${n.focus} \u00b7 ${n.type}`).join('  →  ')}</p>
       </header>
 
       {penalty.multiplier > 0 && (
@@ -505,7 +505,7 @@ export default function Today({ data, setData, prefs }: Props) {
         </>
       )}
       <div className="row center">
-        {onPlan && <button className="ghost" onClick={() => requestFinish('skipped')}>Skip {plan.focus} \u2192 next focus</button>}
+        {onPlan && <button className="ghost" onClick={() => requestFinish('skipped')}>Skip {plan.focus} → next focus</button>}
         
       </div>
 
