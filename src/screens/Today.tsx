@@ -438,13 +438,17 @@ export default function Today({ data, setData, prefs }: Props) {
                 <div className="mv-head" onClick={() => complete && setCollapsed((c) => ({ ...c, [mi]: !c[mi] }))} style={complete ? { cursor: 'pointer' } : undefined}>
                   <div>
                     <h3>{lm.name}{complete ? (collapsed[mi] === false ? ' ▾' : ' ▸') : ''}</h3>
-                    <small>{mv?.target}{mv?.notes ? ` \u00b7 ${mv.notes}` : ''}</small>
+                    <small>{mv ? displayTarget(mv, data.settings.goal, data.settings.prescriptions?.[mv.id]) : ''}{prev?.notes ? ` · Last: ${prev.notes}` : ''}</small>
                   </div>
-                  <span className="row" style={{ gap: 4 }} onClick={(e) => e.stopPropagation()}>
-                    <button className="ghost" disabled={mi === 0} onClick={() => moveCard(mi, -1)} aria-label="Move up">↑</button>
-                    <button className="ghost" disabled={mi === draft.movements.length - 1} onClick={() => moveCard(mi, 1)} aria-label="Move down">↓</button>
-                    <button className={`ghost ${lm.gvt ? 'on' : ''}`} onClick={() => saveDraft(draft.movements.map((m, i) => i === mi ? { ...m, gvt: !m.gvt } : m))}>GVT</button>
-                    <button className="ghost" onClick={() => setPicker({ mode: 'swap', index: mi })}>Swap</button>
+                </div>
+                <div className="mv-actions" onClick={(e) => e.stopPropagation()}>
+                  <span className="mv-actions-group">
+                    <button className="icon" disabled={mi === 0} onClick={() => moveCard(mi, -1)} aria-label="Move up">↑</button>
+                    <button className="icon" disabled={mi === draft.movements.length - 1} onClick={() => moveCard(mi, 1)} aria-label="Move down">↓</button>
+                  </span>
+                  <span className="mv-actions-group">
+                    <button className={`chip ${lm.gvt ? 'on' : ''}`} onClick={() => saveDraft(draft.movements.map((m, i) => i === mi ? { ...m, gvt: !m.gvt } : m))}>GVT</button>
+                    <button className="chip" onClick={() => setPicker({ mode: 'swap', index: mi })}>Swap</button>
                   </span>
                 </div>
                 {complete && collapsed[mi] !== false ? null : (
@@ -532,18 +536,20 @@ export default function Today({ data, setData, prefs }: Props) {
                 </div>
                 )}
                 <div className="mv-foot">
-                  <span className="muted">{prev ? `Last: ${prev.sets.filter((x) => x.done).map((x) => `${x.weight ?? '\u2013'}\u00d7${x.reps ?? '\u2013'}`).join(', ')}` : 'No previous session'}</span>
-                  <span>
-                    <button className="ghost" onClick={() => saveDraft(draft.movements.map((m, i) => i === mi ? { ...m, sets: [...m.sets, { reps: null, weight: null, done: false }] } : m))}>+ Set</button>
-                    {(lm.superset || mi + 1 < draft.movements.length) && (
-                      <button className="ghost" onClick={() => toggleSuperset(mi)}>{lm.superset ? 'Unlink' : 'Superset \u2193'}</button>
-                    )}
-                    <button className="ghost" onClick={() => saveDraft(draft.movements.filter((_, i) => i !== mi))}>Remove</button>
+                  <span className="muted">{prev ? `Last: ${prev.sets.filter((x) => x.done).map((x) => `${x.weight ?? '–'}×${x.reps ?? '–'}`).join(', ')}` : 'No previous session'}</span>
+                  <div className="mv-actions" style={{ margin: '6px 0 0' }}>
+                    <span className="mv-actions-group">
+                      <button className="chip" onClick={() => saveDraft(draft.movements.map((m, i) => i === mi ? { ...m, sets: [...m.sets, { reps: null, weight: null, done: false }] } : m))}>+ Set</button>
+                      {(lm.superset || mi + 1 < draft.movements.length) && (
+                        <button className="chip" onClick={() => toggleSuperset(mi)}>{lm.superset ? 'Unlink' : 'Superset'}</button>
+                      )}
+                      <button className="chip" onClick={() => saveDraft(draft.movements.filter((_, i) => i !== mi))}>Remove</button>
+                    </span>
                     {complete
-                      ? <button className="ghost" onClick={() => reopenMovement(mi)}>Reopen</button>
-                      : <button className="primary" onClick={() => finishMovement(mi)}>Finish movement</button>}
+                      ? <button className="chip" onClick={() => reopenMovement(mi)}>Reopen</button>
+                      : <button className="primary" onClick={() => finishMovement(mi)}>Finish</button>}
+                  </div>
                   <input className="notes" placeholder="Notes" value={lm.notes ?? ''} onChange={(e) => setMovementNotes(mi, e.target.value)} style={{ marginTop: 8, width: '100%' }} />
-                  </span>
                 </div>
                 </>
                 )}
