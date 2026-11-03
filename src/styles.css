@@ -162,8 +162,6 @@ small, .muted { color: var(--muted); }
 .hero .ghost { color: #fff; border-color: rgba(255, 255, 255, .2); background: transparent; }
 .hero .pills { margin-top: 10px; }
 
-.theme-confederate .hero::before { display: none; }
-
 .browse { display: flex; gap: var(--s2); flex-wrap: wrap; align-items: center; }
 .browse select { width: auto; min-width: 148px; }
 .next { color: var(--muted); font-size: var(--fs-sm); margin: var(--s2) 0 0; }
@@ -628,10 +626,12 @@ label.file input { position: absolute; inset: 0; opacity: 0; width: 100%; max-wi
 .theme-templar { --pack: #9f1239; --pack-soft: #fff1f2; --scrim: 63, 16, 24; }
 .theme-jerusalem { --pack: #8a5a12; --pack-soft: #fbf3df; --scrim: 58, 22, 16; }
 .theme-union-jack { --pack: #012169; --pack-soft: #e7eef8; --scrim: 2, 16, 51; }
+.theme-confederate { --pack: #9f1239; --pack-soft: #fdecec; --scrim: 62, 12, 16; }
 
 .theme-templar .hero,
 .theme-jerusalem .hero,
-.theme-union-jack .hero { color: #fff; }
+.theme-union-jack .hero,
+.theme-confederate .hero { color: #fff; }
 .theme-templar .hero {
   background: radial-gradient(95% 150% at 118% 42%, #f7ecec 0%, #e7b7bc 20%, #9f3040 52%, #4a121c 100%);
   border-color: rgba(74, 18, 28, .45);
@@ -653,7 +653,8 @@ label.file input { position: absolute; inset: 0; opacity: 0; width: 100%; max-wi
 
 .theme-templar .hero::before,
 .theme-jerusalem .hero::before,
-.theme-union-jack .hero::before {
+.theme-union-jack .hero::before,
+.theme-confederate .hero::before {
   display: block;
   width: 268px;
   height: 268px;
@@ -691,7 +692,8 @@ label.file input { position: absolute; inset: 0; opacity: 0; width: 100%; max-wi
 
 .theme-templar .hero::after,
 .theme-jerusalem .hero::after,
-.theme-union-jack .hero::after {
+.theme-union-jack .hero::after,
+.theme-confederate .hero::after {
   inset: 0;
   height: auto;
   z-index: 0;
@@ -710,7 +712,11 @@ label.file input { position: absolute; inset: 0; opacity: 0; width: 100%; max-wi
 .theme-union-jack .hero .pill,
 .theme-union-jack .hero .chip,
 .theme-union-jack .hero select,
-.theme-union-jack .hero .ghost {
+.theme-union-jack .hero .ghost,
+.theme-confederate .hero .pill,
+.theme-confederate .hero .chip,
+.theme-confederate .hero select,
+.theme-confederate .hero .ghost {
   background: rgba(var(--scrim), .78);
   color: #fff;
   border-color: color-mix(in srgb, var(--mint) 62%, transparent);
@@ -720,37 +726,52 @@ label.file input { position: absolute; inset: 0; opacity: 0; width: 100%; max-wi
 .theme-jerusalem .hero .pill.Normal,
 .theme-jerusalem .hero .chip.on,
 .theme-union-jack .hero .pill.Normal,
-.theme-union-jack .hero .chip.on {
+.theme-union-jack .hero .chip.on,
+.theme-confederate .hero .pill.Normal,
+.theme-confederate .hero .chip.on {
   color: var(--mint);
   border-color: var(--mint);
   background: rgba(var(--scrim), .84);
 }
 .theme-templar .hero .pill.GVT,
 .theme-jerusalem .hero .pill.GVT,
-.theme-union-jack .hero .pill.GVT {
+.theme-union-jack .hero .pill.GVT,
+.theme-confederate .hero .pill.GVT {
   color: #ffe8d6;
   border-color: rgba(255, 214, 186, .8);
   background: rgba(var(--scrim), .84);
 }
 .theme-templar .chip.on,
 .theme-jerusalem .chip.on,
-.theme-union-jack .chip.on {
+.theme-union-jack .chip.on,
+.theme-confederate .chip.on {
   color: var(--pack);
   border-color: var(--pack);
   background: var(--pack-soft);
 }
 .theme-templar .card.active,
 .theme-jerusalem .card.active,
-.theme-union-jack .card.active {
+.theme-union-jack .card.active,
+.theme-confederate .card.active {
   border-color: color-mix(in srgb, var(--pack) 62%, var(--border));
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--pack) 20%, transparent), var(--shadow);
 }
 
 .theme-confederate .hero {
-  background: #b91c1c url("https://upload.wikimedia.org/wikipedia/commons/thumb/a/ae/Battle_flag_of_the_Confederate_States_of_America_%28With_White_Border%29.svg/800px-Battle_flag_of_the_Confederate_States_of_America_%28With_White_Border%29.svg.png") center/cover;
-  border-color: #1e3a8a;
-  --mint: #fff;
-  --hero-meta: #fecaca;
+  background: radial-gradient(108% 165% at 122% 24%, #c5d0ea 0%, #3d4d7a 18%, #8e2432 46%, #4a1018 100%);
+  border-color: rgba(60, 12, 18, .5);
+  --mint: #ffe8e8;
+  --hero-meta: #f6d4d4;
+}
+.theme-confederate .hero::before {
+  width: 168px;
+  height: 168px;
+  right: -28px;
+  top: -22px;
+  transform: none;
+  filter: blur(2.5px);
+  opacity: .9;
+  background-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 500 500'><rect width='500' height='500' fill='%23fff'/><rect x='18' y='18' width='464' height='464' fill='%23bf0a30'/><path d='M18 18L482 482M482 18L18 482' stroke='%23fff' stroke-width='78' stroke-linecap='square'/><path d='M18 18L482 482M482 18L18 482' stroke='%23002868' stroke-width='50' stroke-linecap='square'/><g fill='%23fff'><path d='M77.50 61.50L81.09 72.56L92.72 72.56L83.31 79.39L86.90 90.44L77.50 83.61L68.10 90.44L71.69 79.39L62.28 72.56L73.91 72.56Z'/><path d='M135.00 119.00L138.59 130.06L150.22 130.06L140.81 136.89L144.40 147.94L135.00 141.11L125.60 147.94L129.19 136.89L119.78 130.06L131.41 130.06Z'/><path d='M192.50 176.50L196.09 187.56L207.72 187.56L198.31 194.39L201.90 205.44L192.50 198.61L183.10 205.44L186.69 194.39L177.28 187.56L188.91 187.56Z'/><path d='M250.00 234.00L253.59 245.06L265.22 245.06L255.81 251.89L259.40 262.94L250.00 256.11L240.60 262.94L244.19 251.89L234.78 245.06L246.41 245.06Z'/><path d='M307.50 291.50L311.09 302.56L322.72 302.56L313.31 309.39L316.90 320.44L307.50 313.61L298.10 320.44L301.69 309.39L292.28 302.56L303.91 302.56Z'/><path d='M365.00 349.00L368.59 360.06L380.22 360.06L370.81 366.89L374.40 377.94L365.00 371.11L355.60 377.94L359.19 366.89L349.78 360.06L361.41 360.06Z'/><path d='M422.50 406.50L426.09 417.56L437.72 417.56L428.31 424.39L431.90 435.44L422.50 428.61L413.10 435.44L416.69 424.39L407.28 417.56L418.91 417.56Z'/><path d='M422.50 61.50L426.09 72.56L437.72 72.56L428.31 79.39L431.90 90.44L422.50 83.61L413.10 90.44L416.69 79.39L407.28 72.56L418.91 72.56Z'/><path d='M365.00 119.00L368.59 130.06L380.22 130.06L370.81 136.89L374.40 147.94L365.00 141.11L355.60 147.94L359.19 136.89L349.78 130.06L361.41 130.06Z'/><path d='M307.50 176.50L311.09 187.56L322.72 187.56L313.31 194.39L316.90 205.44L307.50 198.61L298.10 205.44L301.69 194.39L292.28 187.56L303.91 187.56Z'/><path d='M192.50 291.50L196.09 302.56L207.72 302.56L198.31 309.39L201.90 320.44L192.50 313.61L183.10 320.44L186.69 309.39L177.28 302.56L188.91 302.56Z'/><path d='M135.00 349.00L138.59 360.06L150.22 360.06L140.81 366.89L144.40 377.94L135.00 371.11L125.60 377.94L129.19 366.89L119.78 360.06L131.41 360.06Z'/><path d='M77.50 406.50L81.09 417.56L92.72 417.56L83.31 424.39L86.90 435.44L77.50 428.61L68.10 435.44L71.69 424.39L62.28 417.56L73.91 417.56Z'/></g></svg>");
 }
 
 /* Option 1 body map: silhouette + positioned muscle overlays */
