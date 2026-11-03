@@ -222,22 +222,25 @@ export default function Today({ data, setData, prefs }: Props) {
   const setKind = (mi: number, si: number, kind: SetKind) =>
     saveDraft(draft.movements.map((m, i) => i !== mi ? m : { ...m, sets: m.sets.map((x, j) => j === si ? { ...x, kind: kind === 'working' ? undefined : kind } : x) }));
 
-  const startSuperset = (mi: number) => {
-    const lm = draft.movements[mi];
-    if (lm.superset) {
-      const g = lm.superset;
-      saveDraft(draft.movements.map((m) => (m.superset === g ? { ...m, superset: undefined } : m)));
-      return;
-    }
-    setSsPick({ index: mi, selected: [] });
+  const startSuperset = (mi: number) => setSsPick({ index: mi, selected: [] });
+
+  const addToSuperset = (primary: number, partners: number[]) => {
+    const g = draft.movements[primary].superset ?? uid();
+    const ids = new Set([primary, ...partners]);
+    saveDraft(draft.movements.map((m, i) => ids.has(i) ? { ...m, superset: g } : m));
   };
 
-  const confirmSuperset = () => {
-    if (!ssPick) return;
-    const g = uid();
-    const ids = new Set([ssPick.index, ...ssPick.selected]);
-    saveDraft(draft.movements.map((m, i) => ids.has(i) ? { ...m, superset: g } : m));
-    setSsPick(null);
+  const unlinkOne = (mi: number) => {
+    const g = draft.movements[mi].superset;
+    if (!g) return;
+    const left = draft.movements.filter((m, i) => i !== mi && m.superset === g).length;
+    saveDraft(draft.movements.map((m, i) => (i === mi || (left <= 1 && m.superset === g)) ? { ...m, superset: undefined } : m));
+  };
+
+  const unlinkAll = (mi: number) => {
+    const g = draft.movements[mi].superset;
+    if (!g) return;
+    saveDraft(draft.movements.map((m) => m.superset === g ? { ...m, superset: undefined } : m));
   };
 
   
@@ -298,7 +301,12 @@ export default function Today({ data, setData, prefs }: Props) {
 
   const pick = (m: Movement) => {
     if (!picker) return;
-    if (picker.mode === 'add') saveDraft([...draft.movements, blank(m)]);
+    if (picker.mode === 'superset' && ssPick) {
+      const g = draft.movements[ssPick.index].superset ?? uid();
+      const next = draft.movements.map((x, i) => i === ssPick.index ? { ...x, superset: g } : x);
+      next.push({ ...blank(m), superset: g });
+      saveDraft(next);
+    } else if (picker.mode === 'add') saveDraft([...draft.movements, blank(m)]);
     else saveDraft(draft.movements.map((x, i) => (i === picker.index ? blank(m) : x)));
     setPicker(null);
   };
@@ -487,7 +495,10 @@ export default function Today({ data, setData, prefs }: Props) {
                 )}
                 {lm.superset && draft.movements.map((pm, pi) => pi !== mi && pm.superset === lm.superset ? (
                   <div key={pi} className="sets" style={{ marginTop: 10 }}>
-                    <p className="muted" style={{ margin: '4px 0' }}>{pm.name}</p>
+                    <div className="row" style={{ margin: '4px 0', justifyContent: 'space-between' }}>
+                      <span className="muted">{pm.name}</span>
+                      <button className="chip" onClick={() => unlinkOne(pi)}>Unlink</button>
+                    </div>
                     <div className="sets-h"><span>Set</span><span>kg</span><span>Reps</span><span /></div>
                     {pm.sets.map((s, si) => (
                       <SetRow key={si} index={si} s={s}
@@ -503,7 +514,7 @@ export default function Today({ data, setData, prefs }: Props) {
                   <div className="mv-actions" style={{ margin: '6px 0 0' }}>
                     <span className="mv-actions-group">
                       <button className="chip" onClick={() => saveDraft(draft.movements.map((m, i) => i === mi ? { ...m, sets: [...m.sets, { reps: null, weight: null, done: false }] } : m))}>+ Set</button>
-                      <button className={`chip ${lm.superset ? 'on' : ''}`} onClick={() => startSuperset(mi)}>{lm.superset ? 'Unlink' : 'Superset'}</button>
+                      <button className={`chip ${lm.superset ? 'on' : ''}`} onClick={() => startSuperset(mi)}>Superset</button>
                       <button className="chip" onClick={() => saveDraft(draft.movements.filter((_, i) => i !== mi))}>Remove</button>
                     </span>
                     {complete
@@ -538,7 +549,7 @@ export default function Today({ data, setData, prefs }: Props) {
       {picker && (
         <div className="sheet" onClick={() => setPicker(null)}>
           <div className="sheet-body" onClick={(e) => e.stopPropagation()}>
-            <h3>{picker.mode === 'add' ? 'Add movement' : 'Swap movement'}</h3>
+            <h3>{picker.mode === 'swap' ? 'Swap movement' : 'Add movement'}</h3>
             <Picker movements={data.movements} focus={plan.focus} onPick={pick} />
           </div>
         </div>
@@ -558,20 +569,29 @@ export default function Today({ data, setData, prefs }: Props) {
       {ssPick && (
         <div className="sheet" onClick={() => setSsPick(null)}>
           <div className="sheet-body" onClick={(e) => e.stopPropagation()}>
-            <h3>Superset with</h3>
-            <p className="muted">Pick one or more. They run back-to-back as one set, then you rest.</p>
-            <div className="chips">
-              {draft.movements.map((m, i) => i === ssPick.index ? null : (
-                <button key={i} className={`chip ${ssPick.selected.includes(i) ? 'on' : ''}`}
-                  onClick={() => setSsPick({ ...ssPick, selected: ssPick.selected.includes(i) ? ssPick.selected.filter((x) => x !== i) : [...ssPick.selected, i] })}>
-                  {m.name}
-                </button>
-              ))}
-            </div>
-            <button className="ghost wide" onClick={() => { setPicker({ mode: 'add' }); }}>Add a new movement</button>
+            <h3>Superset</h3>
+            <p className="muted">Add movements. They run back-to-back, then you rest. Unlink one if you pick wrong.</p>
+            {draft.movements[ssPick.index].superset && (
+              <div className="chips" style={{ marginBottom: 8 }}>
+                {draft.movements.map((m, i) => m.superset === draft.movements[ssPick.index].superset && i !== ssPick.index ? (
+                  <button key={i} className="chip on" onClick={() => unlinkOne(i)}>{m.name} · unlink</button>
+                ) : null)}
+              </div>
+            )}
+            <button className="primary wide" onClick={() => setPicker({ mode: 'superset', index: ssPick.index })}>Add a movement</button>
+            {draft.movements.some((m, i) => i !== ssPick.index && m.superset !== draft.movements[ssPick.index].superset) && (
+              <>
+                <p className="muted" style={{ marginTop: 10 }}>Or link one already in the session:</p>
+                <div className="chips">
+                  {draft.movements.map((m, i) => i === ssPick.index || m.superset === draft.movements[ssPick.index].superset ? null : (
+                    <button key={i} className="chip" onClick={() => addToSuperset(ssPick.index, [i])}>{m.name}</button>
+                  ))}
+                </div>
+              </>
+            )}
             <div className="row" style={{ marginTop: 12 }}>
-              <button className="ghost" onClick={() => setSsPick(null)}>Cancel</button>
-              <button className="primary" disabled={ssPick.selected.length === 0} onClick={confirmSuperset}>Link</button>
+              {draft.movements[ssPick.index].superset && <button className="ghost" onClick={() => { unlinkAll(ssPick.index); setSsPick(null); }}>Unlink all</button>}
+              <button className="primary" onClick={() => setSsPick(null)}>Done</button>
             </div>
           </div>
         </div>
