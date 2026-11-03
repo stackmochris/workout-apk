@@ -58,6 +58,15 @@ export default function SettingsScreen({ data, setData }: Props) {
     <section>
       <header className="hero"><small>Preferences</small><h1>Settings</h1></header>
       <div className="card form">
+        
+      <div className="card form">
+        <h3>Your name</h3>
+        <p className="muted">Stored on this phone. Firebase is only needed when others need to see it.</p>
+        <label>Name
+          <input value={s.displayName ?? ''} onChange={(e) => set({ displayName: e.target.value })} placeholder="e.g. Chris" />
+        </label>
+      </div>
+
         <h3>Visual customization</h3>
         <p className="muted small">Hero background packs</p>
         <div className="chips">
