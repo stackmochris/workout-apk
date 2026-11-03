@@ -211,12 +211,9 @@ export default function Today({ data, setData, prefs }: Props) {
     const lm = movements[mi];
     const group = lm.superset ? movements.map((m, i) => ({ m, i })).filter((x) => x.m.superset === lm.superset) : [];
     if (group.length > 1) {
-      const pos = group.findIndex((x) => x.i === mi);
-      const partner = group[(pos + 1) % group.length].m;
-      const partnerPending = partner.sets[si] && !partner.sets[si].done;
-      setRest((r) => partnerPending
-        ? { n: r.n + 1, seconds: data.settings.supersetRest, label: `→ ${short(partner.name)}` }
-        : { n: r.n + 1, seconds: full, label: `Rest → ${short(group[0].m.name)}` });
+      const pending = group.filter((x) => !x.m.sets[si]?.done);
+      if (pending.length) return; // more movements in this set — no rest
+      setRest((r) => ({ n: r.n + 1, seconds: full, label: `Rest → ${short(group[0].m.name)}` }));
       return;
     }
     setRest((r) => ({ n: r.n + 1, seconds: full, label: 'Rest' }));
@@ -369,7 +366,11 @@ export default function Today({ data, setData, prefs }: Props) {
           {(() => {
           const indexed = draft.movements.map((lm, mi) => ({ lm, mi, complete: !!lm.finished || (lm.sets.length > 0 && lm.sets.every((s) => s.done)) }));
           const ordered = [...indexed.filter((x) => !x.complete), ...indexed.filter((x) => x.complete)];
-          return ordered.map(({ lm, mi, complete }) => {
+          return ordered.filter(({ lm, mi }) => {
+            if (!lm.superset) return true;
+            const first = draft.movements.findIndex((m) => m.superset === lm.superset);
+            return first === mi;
+          }).map(({ lm, mi, complete }) => {
             const mv = byId.get(lm.movementId);
             const prev = previousFor(data.sessions, lm.movementId);
             const flagged = !!mv?.flags.length;
@@ -484,6 +485,19 @@ export default function Today({ data, setData, prefs }: Props) {
                   })}
                 </div>
                 )}
+                {lm.superset && draft.movements.map((pm, pi) => pi !== mi && pm.superset === lm.superset ? (
+                  <div key={pi} className="sets" style={{ marginTop: 10 }}>
+                    <p className="muted" style={{ margin: '4px 0' }}>{pm.name}</p>
+                    <div className="sets-h"><span>Set</span><span>kg</span><span>Reps</span><span /></div>
+                    {pm.sets.map((s, si) => (
+                      <SetRow key={si} index={si} s={s}
+                        hint={{ weight: null, reps: null }}
+                        onEdit={(patch) => updateSet(pi, si, patch)}
+                        onKind={(k) => setKind(pi, si, k)}
+                        onTick={() => updateSet(pi, si, s.done ? { reps: null } : { reps: s.reps ?? null, weight: s.weight ?? null })} />
+                    ))}
+                  </div>
+                ) : null)}
                 <div className="mv-foot">
                   <span className="muted">{prev ? `Last: ${prev.sets.filter((x) => x.done).map((x) => `${x.weight ?? '–'}×${x.reps ?? '–'}`).join(', ')}` : 'No previous session'}</span>
                   <div className="mv-actions" style={{ margin: '6px 0 0' }}>
