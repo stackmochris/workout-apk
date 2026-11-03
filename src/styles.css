@@ -241,3 +241,13 @@ label.file input { position: absolute; inset: 0; opacity: 0; width: 100%; max-wi
 .notes { width: 100%; margin-top: 8px; font-size: 14px; }
 .card.complete .mv-head { opacity: .85; }
 
+
+.mv-actions { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin: 6px 0 10px; }
+.mv-actions-group { display: flex; gap: 4px; align-items: center; }
+.mv-actions .chip { padding: 4px 10px; font-size: 12px; }
+.mv-actions .icon { background: none; border: 1px solid var(--border); border-radius: 8px; width: 28px; height: 28px; padding: 0; color: var(--muted); font-size: 14px; }
+.mv-actions .icon:disabled { opacity: .35; }
+.mv-head { display: block; }
+.mv-head h3 { margin: 0 0 2px; }
+.mv-foot { flex-direction: column; align-items: stretch; }
+.mv-foot .muted { margin-bottom: 2px; }
