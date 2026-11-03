@@ -320,9 +320,7 @@ export default function Today({ data, setData, prefs }: Props) {
           <select aria-label="Browse focus" value={plan.focus} onChange={(e) => { setGvtPicks(null); setGvtRun(null); const f = e.target.value as Focus; setBrowse(f === planned.focus && plan.type === planned.type ? null : { focus: f, type: plan.type }); }}>
             {FOCI.map((f) => <option key={f} value={f}>{f === 'NoGym' ? 'No Gym' : f}</option>)}
           </select>
-          {(['Normal', 'GVT'] as SessionType[]).map((t) => (
-            <button key={t} className={`chip ${plan.type === t ? 'on' : ''}`} onClick={() => { setGvtPicks(null); setGvtRun(null); setBrowse(plan.focus === planned.focus && t === planned.type ? null : { focus: plan.focus, type: t }); }}>{t}</button>
-          ))}
+          
           {browse && <button className="ghost" onClick={() => { setBrowse(null); setGvtPicks(null); setGvtRun(null); }}>Back to today</button>}
         </div>
         <div className="row" style={{ marginTop: 8 }}>
@@ -358,7 +356,7 @@ export default function Today({ data, setData, prefs }: Props) {
             });
           }}
         />
-      ) : plan.type === 'GVT' ? (
+      ) : false && plan.type === 'GVT' ? (
         <div className="card gvt-card">
           {!gvtPicks && !draft.movements.slice(0, 3).some((m) => doneSets(m) > 0) ? (
             <>
