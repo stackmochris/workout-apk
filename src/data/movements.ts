@@ -73,9 +73,9 @@ const seeds: Record<Movement['focus'], Seed[]> = {
     ['Cross-body curl', 3, 10, 15, 'dumbbell', undefined, E],
     ['Concentration curl', 3, 8, 12, 'dumbbell', undefined, E],
     ['Skull crusher', 3, 8, 12, 'barbell', undefined, E],
-    ['Cable adduction', 3, 12, 15, 'cable'],
   ],
   Leg: [
+    ['Cable adduction', 3, 12, 15, 'cable'],
     ['Barbell RDL / DB RDL', 3, 6, 8, 'barbell', 'Keep honest at 90 kg, controlled'],
     ['Leg press (or hack)', 3, 15, 20, 'machine', 'Pump only, no grinding'],
     ['Leg curl', 3, 12, 15, 'machine'],
@@ -146,9 +146,17 @@ const seeds: Record<Movement['focus'], Seed[]> = {
 
 const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
 
+const seen = new Set<string>();
+const uniqueId = (name: string, focus: string) => {
+  const base = slug(name);
+  const id = seen.has(base) ? `${base}-${slug(focus)}` : base;
+  seen.add(id);
+  return id;
+};
+
 export const SEED_MOVEMENTS: Movement[] = Object.entries(seeds).flatMap(([focus, list]) =>
   list.map(([name, sets, repMin, repMax, equipment, notes, elbow]) => ({
-    id: slug(name),
+    id: uniqueId(name, focus),
     name,
     focus: focus as Movement['focus'],
     sets,
