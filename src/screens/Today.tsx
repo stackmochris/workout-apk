@@ -357,37 +357,6 @@ export default function Today({ data, setData, prefs }: Props) {
           }}
         />
       ) : (
-            <>
-              {draft.movements.slice(0, 3).map((lm, mi) => {
-                const done = doneSets(lm);
-                const total = data.settings.gvt.sets;
-                const prev = previousFor(data.sessions, lm.movementId);
-                const prevKg = prev ? [...prev.sets].reverse().find((x) => x.done && x.weight != null)?.weight : undefined;
-                return (
-                  <article key={lm.movementId} className={`card mv ${done >= total ? 'complete' : done ? 'active' : ''}`}>
-                    <h3>{lm.name}</h3>
-                    {done > 0 && <p className="muted">{blocks(lm.sets).map(blockLabel).join(' \u00b7 ')}</p>}
-                    {done < total ? (
-                      <div className="gvt-start">
-                        <NumInput kind="kg" label={`${lm.name} kg`} value={gvtKg[mi] ?? null} placeholder={prevKg != null ? String(prevKg) : 'kg'}
-                          onChange={(n) => setGvtKg((k) => ({ ...k, [mi]: n }))} />
-                        <button className="primary" onClick={() => setGvtRun({ index: mi, weight: gvtKg[mi] ?? prevKg ?? null })}>
-                          {done ? `Start set ${done + 1}` : 'Start'}
-                        </button>
-                      </div>
-                    ) : <p className="muted">{total} sets done</p>}
-                  </article>
-                );
-              })}
-              <button className="primary wide" disabled={!draft.movements.slice(0, 3).some((m) => doneSets(m) > 0)}
-                onClick={() => requestFinish('completed', { movements: draft.movements.slice(0, 3).filter((m) => doneSets(m) > 0), gvtRepsPerMinute: draft.movements.slice(0, 3).flatMap((m) => m.sets.filter((x) => x.done).map((x) => x.reps ?? 0)) })}>
-                Finish GVT session
-              </button>
-              <button className="ghost wide" onClick={() => setGvtPicks(null)}>Change movements</button>
-            </>
-          )}
-        </div>
-      ) : (
         <>
           {(() => {
           const indexed = draft.movements.map((lm, mi) => ({ lm, mi, complete: !!lm.finished || (lm.sets.length > 0 && lm.sets.every((s) => s.done)) }));
