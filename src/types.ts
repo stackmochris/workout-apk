@@ -122,6 +122,8 @@ export interface Settings {
     watch: string[];
   };
   theme: Theme;
+  /** Local display name. No account required. */
+  displayName?: string;
   /** Drives the set/rep sub-heading shown on each movement. */
   goal: Goal;
   /** What cardio cards should prioritise. */
