@@ -18,7 +18,6 @@ const THEMES: { id: Theme; label: string }[] = [
   { id: 'jerusalem', label: 'Jerusalem Cross' },
   { id: 'union-jack', label: 'Union Jack' },
   { id: 'confederate', label: 'Confederate Flag' },
-  { id: 'pride', label: 'Pride Flag' },
 ];
 
 const GOALS: { id: Goal; label: string }[] = [

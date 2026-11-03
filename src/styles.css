@@ -162,10 +162,7 @@ small, .muted { color: var(--muted); }
 .hero .ghost { color: #fff; border-color: rgba(255, 255, 255, .2); background: transparent; }
 .hero .pills { margin-top: 10px; }
 
-.theme-templar .hero::before,
-.theme-union-jack .hero::before,
-.theme-confederate .hero::before,
-.theme-pride .hero::before { display: none; }
+.theme-confederate .hero::before { display: none; }
 
 .browse { display: flex; gap: var(--s2); flex-wrap: wrap; align-items: center; }
 .browse select { width: auto; min-width: 148px; }
@@ -627,51 +624,134 @@ label.file input { position: absolute; inset: 0; opacity: 0; width: 100%; max-wi
 }
 .theme-gold .hero h1, .theme-gold .hero .pill.Normal { color: #fef3c7; }
 
+/* Motif packs: emblem sits on the right, spectrum and scrim carry the colour. */
+.theme-templar { --pack: #9f1239; --pack-soft: #fff1f2; --scrim: 63, 16, 24; }
+.theme-jerusalem { --pack: #8a5a12; --pack-soft: #fbf3df; --scrim: 58, 22, 16; }
+.theme-union-jack { --pack: #012169; --pack-soft: #e7eef8; --scrim: 2, 16, 51; }
+
+.theme-templar .hero,
+.theme-jerusalem .hero,
+.theme-union-jack .hero { color: #fff; }
 .theme-templar .hero {
-  background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath d='M42 8h16v84h-16zM8 42h84v16H8z' fill='%23b91c1c'/%3E%3C/svg%3E") right 8px center / 92px no-repeat;
-  color: #111;
-  border-color: #b91c1c;
-  --mint: #b91c1c;
-  --hero-meta: #475569;
+  background: radial-gradient(95% 150% at 118% 42%, #f7ecec 0%, #e7b7bc 20%, #9f3040 52%, #4a121c 100%);
+  border-color: rgba(74, 18, 28, .45);
+  --mint: #ffe8eb;
+  --hero-meta: #f6d5da;
 }
-.theme-templar .hero h1 { color: #b91c1c; }
-.theme-templar .hero small, .theme-templar .hero .next, .theme-templar .hero .muted { color: #475569; }
+.theme-jerusalem .hero {
+  background: radial-gradient(100% 155% at 118% 40%, #fbf3df 0%, #e2b657 22%, #9a2e38 56%, #3f1414 100%);
+  border-color: rgba(63, 20, 20, .45);
+  --mint: #fff3d1;
+  --hero-meta: #f6e3b8;
+}
+.theme-union-jack .hero {
+  background: radial-gradient(100% 160% at 120% 28%, #f6d6d8 0%, #c8102e 24%, #1a3e86 56%, #012169 100%);
+  border-color: rgba(1, 33, 105, .5);
+  --mint: #f4f7ff;
+  --hero-meta: #d6e2f5;
+}
+
+.theme-templar .hero::before,
+.theme-jerusalem .hero::before,
+.theme-union-jack .hero::before {
+  display: block;
+  width: 268px;
+  height: 268px;
+  right: -78px;
+  top: 50%;
+  transform: translateY(-50%);
+  filter: blur(5px);
+  opacity: .74;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: contain;
+  z-index: 0;
+}
+.theme-templar .hero::before {
+  background-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'><circle cx='100' cy='100' r='98' fill='%23fbf7f4'/><g fill='%23c8102e'><path d='M42 26Q100 2 158 26Q104 48 108 114H92Q96 48 42 26Z'/><path d='M42 26Q100 2 158 26Q104 48 108 114H92Q96 48 42 26Z' transform='rotate(90 100 100)'/><path d='M42 26Q100 2 158 26Q104 48 108 114H92Q96 48 42 26Z' transform='rotate(180 100 100)'/><path d='M42 26Q100 2 158 26Q104 48 108 114H92Q96 48 42 26Z' transform='rotate(270 100 100)'/></g></svg>");
+}
+.theme-jerusalem .hero::before {
+  width: 168px;
+  height: 168px;
+  right: -26px;
+  top: -22px;
+  transform: none;
+  filter: blur(2px);
+  opacity: .92;
+  background-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 184 184'><g transform='translate(32 32)'><g fill='%23e2b657'><rect x='46' y='8' width='28' height='104'/><rect x='26' y='8' width='68' height='22'/><rect x='26' y='90' width='68' height='22'/><rect x='8' y='46' width='104' height='28'/><rect x='8' y='26' width='22' height='68'/><rect x='90' y='26' width='22' height='68'/></g><g fill='%239d1c2c'><rect x='50' y='13' width='20' height='94'/><rect x='31' y='13' width='58' height='16'/><rect x='31' y='91' width='58' height='16'/><rect x='13' y='50' width='94' height='20'/><rect x='13' y='31' width='16' height='58'/><rect x='91' y='31' width='16' height='58'/></g><g fill='%23e2b657'><rect x='6' y='13' width='18' height='4.5'/><rect x='12.75' y='6' width='4.5' height='18'/><rect x='96' y='13' width='18' height='4.5'/><rect x='102.75' y='6' width='4.5' height='18'/><rect x='6' y='102.5' width='18' height='4.5'/><rect x='12.75' y='96' width='4.5' height='18'/><rect x='96' y='102.5' width='18' height='4.5'/><rect x='102.75' y='96' width='4.5' height='18'/></g></g></svg>");
+}
+.theme-union-jack .hero::before {
+  width: 360px;
+  height: 180px;
+  right: -96px;
+  filter: blur(3.5px);
+  opacity: .82;
+  background-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 60 30'><defs><clipPath id='s'><path d='M30,15 h30 v15 z v15 h-30 z h-30 v-15 z v-15 h30 z'/></clipPath></defs><path d='M0,0 v30 h60 v-30 z' fill='%23012169'/><path d='M0,0 L60,30 M60,0 L0,30' stroke='%23fff' stroke-width='6'/><path d='M0,0 L60,30 M60,0 L0,30' stroke='%23C8102E' stroke-width='4' clip-path='url(%23s)'/><path d='M30,0 v30 M0,15 h60' stroke='%23fff' stroke-width='10'/><path d='M30,0 v30 M0,15 h60' stroke='%23C8102E' stroke-width='6'/></svg>");
+}
+
+.theme-templar .hero::after,
+.theme-jerusalem .hero::after,
+.theme-union-jack .hero::after {
+  inset: 0;
+  height: auto;
+  z-index: 0;
+  background:
+    linear-gradient(180deg, transparent 76%, rgba(0, 0, 0, .16)),
+    linear-gradient(90deg, rgba(var(--scrim), .94) 0%, rgba(var(--scrim), .9) 36%, rgba(var(--scrim), .58) 58%, rgba(var(--scrim), .16) 76%, rgba(var(--scrim), 0) 88%);
+}
 .theme-templar .hero .pill,
 .theme-templar .hero .chip,
 .theme-templar .hero select,
-.theme-templar .hero .ghost {
-  background: #fff;
-  color: #111;
-  border-color: #cbd5e1;
+.theme-templar .hero .ghost,
+.theme-jerusalem .hero .pill,
+.theme-jerusalem .hero .chip,
+.theme-jerusalem .hero select,
+.theme-jerusalem .hero .ghost,
+.theme-union-jack .hero .pill,
+.theme-union-jack .hero .chip,
+.theme-union-jack .hero select,
+.theme-union-jack .hero .ghost {
+  background: rgba(var(--scrim), .78);
+  color: #fff;
+  border-color: color-mix(in srgb, var(--mint) 62%, transparent);
 }
 .theme-templar .hero .pill.Normal,
-.theme-templar .hero .chip.on {
-  color: #b91c1c;
-  border-color: #b91c1c;
-  background: #fef2f2;
+.theme-templar .hero .chip.on,
+.theme-jerusalem .hero .pill.Normal,
+.theme-jerusalem .hero .chip.on,
+.theme-union-jack .hero .pill.Normal,
+.theme-union-jack .hero .chip.on {
+  color: var(--mint);
+  border-color: var(--mint);
+  background: rgba(var(--scrim), .84);
 }
-.theme-templar .hero .pill.GVT { color: #9a3412; border-color: #fdba74; }
+.theme-templar .hero .pill.GVT,
+.theme-jerusalem .hero .pill.GVT,
+.theme-union-jack .hero .pill.GVT {
+  color: #ffe8d6;
+  border-color: rgba(255, 214, 186, .8);
+  background: rgba(var(--scrim), .84);
+}
+.theme-templar .chip.on,
+.theme-jerusalem .chip.on,
+.theme-union-jack .chip.on {
+  color: var(--pack);
+  border-color: var(--pack);
+  background: var(--pack-soft);
+}
+.theme-templar .card.active,
+.theme-jerusalem .card.active,
+.theme-union-jack .card.active {
+  border-color: color-mix(in srgb, var(--pack) 62%, var(--border));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--pack) 20%, transparent), var(--shadow);
+}
 
-.theme-union-jack .hero {
-  background: #012169 url("https://upload.wikimedia.org/wikipedia/commons/thumb/0/02/Union_Jack_Flag_%28PSF%29.png/800px-Union_Jack_Flag_%28PSF%29.png") center/cover;
-  border-color: #fff;
-  --mint: #fff;
-  --hero-meta: #ddd;
-}
 .theme-confederate .hero {
   background: #b91c1c url("https://upload.wikimedia.org/wikipedia/commons/thumb/a/ae/Battle_flag_of_the_Confederate_States_of_America_%28With_White_Border%29.svg/800px-Battle_flag_of_the_Confederate_States_of_America_%28With_White_Border%29.svg.png") center/cover;
   border-color: #1e3a8a;
   --mint: #fff;
   --hero-meta: #fecaca;
 }
-.theme-pride .hero {
-  background: url("https://upload.wikimedia.org/wikipedia/commons/thumb/4/48/Gay_Pride_Flag.svg/800px-Gay_Pride_Flag.svg.png") center/cover;
-  border-color: #000;
-  --mint: #fff;
-  --hero-meta: #fff;
-  color: #fff;
-}
-.theme-pride .hero h1 { text-shadow: 0 1px 2px #0008; }
 
 /* Option 1 body map: silhouette + positioned muscle overlays */
 .body-figure { position: relative; width: 120px; margin: 0; text-align: center; }

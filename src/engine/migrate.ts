@@ -1,7 +1,7 @@
 import { initialRotation } from './rotation';
 import { DEFAULT_PENALTY } from './week';
 import { SEED_MOVEMENTS } from '../data/movements';
-import { BodyEntry, LoggedMovement, Movement, RotationState, Session, Settings } from '../types';
+import { BodyEntry, LoggedMovement, Movement, RotationState, Session, Settings, Theme } from '../types';
 
 export const DATA_VERSION = 2;
 
@@ -40,6 +40,12 @@ export const DEFAULT_SETTINGS: Settings = {
   prescriptions: {},
 };
 
+/** Saved "pride" packs are retired; anything else is kept. */
+export function normalizeTheme(theme: unknown): Theme {
+  if (theme === 'pride' || theme == null || theme === '') return 'green';
+  return theme as Theme;
+}
+
 export function freshData(): AppData {
   return { version: 2, movements: SEED_MOVEMENTS, rotation: initialRotation(), sessions: [], draft: null, settings: DEFAULT_SETTINGS, body: [] };
 }
@@ -65,7 +71,7 @@ export function migrate(raw: unknown): AppData {
       gvt: { ...DEFAULT_SETTINGS.gvt, ...d.settings?.gvt },
       targets: { ...DEFAULT_SETTINGS.targets, ...d.settings?.targets },
       frequency: { ...DEFAULT_SETTINGS.frequency, ...d.settings?.frequency },
-      theme: d.settings?.theme ?? 'green',
+      theme: normalizeTheme(d.settings?.theme),
       displayName: d.settings?.displayName ?? '',
       goal: d.settings?.goal ?? 'mixed',
       cardioGoal: d.settings?.cardioGoal ?? 'maintenance',

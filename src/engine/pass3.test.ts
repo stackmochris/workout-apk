@@ -118,6 +118,11 @@ describe('migration', () => {
   it('returns fresh data for junk', () => {
     expect(migrate(null).settings).toEqual(DEFAULT_SETTINGS);
   });
+  it('maps a saved pride theme to green and keeps the other packs', () => {
+    expect(migrate({ settings: { theme: 'pride' }, sessions: [] }).settings.theme).toBe('green');
+    expect(migrate({ settings: { theme: 'union-jack' }, sessions: [] }).settings.theme).toBe('union-jack');
+    expect(migrate({ settings: { theme: 'jerusalem' }, sessions: [] }).settings.theme).toBe('jerusalem');
+  });
   it('import refuses non-backups', () => {
     expect(() => parseBackup('{"foo":1}')).toThrow();
     expect(parseBackup('{"sessions":[]}').version).toBe(2);
