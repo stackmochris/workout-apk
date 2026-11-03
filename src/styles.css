@@ -251,3 +251,57 @@ label.file input { position: absolute; inset: 0; opacity: 0; width: 100%; max-wi
 .mv-head h3 { margin: 0 0 2px; }
 .mv-foot { flex-direction: column; align-items: stretch; }
 .mv-foot .muted { margin-bottom: 2px; }
+
+/* Option 1 body map: silhouette + positioned muscle overlays */
+.body-figure {
+  position: relative;
+  width: 120px;
+  margin: 0;
+  text-align: center;
+}
+.body-figure img {
+  width: 100%;
+  display: block;
+  filter: contrast(1.05);
+}
+.body-figure figcaption {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 4px;
+}
+.muscle {
+  position: absolute;
+  border-radius: 50%;
+  opacity: 0.78;
+  pointer-events: none;
+  transition: background .4s;
+  mix-blend-mode: multiply;
+}
+/* Front positions (percentages relative to cropped silhouette) */
+.front .chest      { left: 32%; top: 16%; width: 36%; height: 7%; border-radius: 40%; }
+.front .frontDelts { left: 18%; top: 15%; width: 14%; height: 5%; }
+.front .frontDelts.r { left: 68%; }
+.front .sideDelts  { left: 10%; top: 17%; width: 10%; height: 6%; }
+.front .sideDelts.r { left: 80%; }
+.front .biceps     { left: 12%; top: 22%; width: 12%; height: 8%; }
+.front .biceps.r   { left: 76%; }
+.front .abs        { left: 34%; top: 25%; width: 32%; height: 12%; border-radius: 30%; }
+.front .quads      { left: 28%; top: 40%; width: 18%; height: 14%; }
+.front .quads.r    { left: 54%; }
+.front .calves     { left: 30%; top: 62%; width: 12%; height: 10%; }
+.front .calves.r   { left: 58%; }
+/* Back positions */
+.back .traps       { left: 34%; top: 14%; width: 32%; height: 6%; border-radius: 40%; }
+.back .rearDelts   { left: 16%; top: 16%; width: 14%; height: 5%; }
+.back .rearDelts.r { left: 70%; }
+.back .upperBack   { left: 30%; top: 20%; width: 40%; height: 7%; border-radius: 40%; }
+.back .lats        { left: 22%; top: 24%; width: 22%; height: 12%; border-radius: 40%; }
+.back .lats.r      { left: 56%; }
+.back .triceps     { left: 10%; top: 22%; width: 12%; height: 8%; }
+.back .triceps.r   { left: 78%; }
+.back .glutes      { left: 28%; top: 36%; width: 18%; height: 7%; }
+.back .glutes.r    { left: 54%; }
+.back .hamstrings  { left: 28%; top: 43%; width: 16%; height: 12%; }
+.back .hamstrings.r { left: 56%; }
+.back .calves      { left: 30%; top: 60%; width: 12%; height: 10%; }
+.back .calves.r    { left: 58%; }
