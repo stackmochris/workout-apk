@@ -86,7 +86,7 @@ export default function FinishSheet({
             <strong>PRs</strong>
             <ul className="muted small">
               {stats.prs.map((p) => (
-                <li key={p.movement}>{p.movement}: {p.weight} kg \u00d7 {p.reps}</li>
+                <li key={p.movement}>{p.movement}: <b className="tick-num">{p.weight}</b> kg × <b className="tick-num">{p.reps}</b></li>
               ))}
             </ul>
           </div>
@@ -129,7 +129,7 @@ function Stat({ label, value, on, toggle }: { label: string; value: string; on?:
   return (
     <button type="button" className={`chip ${on === false ? '' : 'on'}`} onClick={toggle} style={{ textAlign: 'left', opacity: on === false ? 0.5 : 1 }}>
       <small style={{ display: 'block', opacity: 0.7 }}>{label}</small>
-      <strong>{value}</strong>
+      <strong className="nums">{value}</strong>
     </button>
   );
 }

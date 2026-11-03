@@ -14,7 +14,7 @@ function SessionCard({ s }: { s: Session }) {
       </div>
       {s.status === 'skipped' ? <p className="muted">Skipped</p> : s.movements.map((m) => (
         <p key={m.movementId} className="hist-line"><span>{m.name}</span>
-          <span className="muted">{cardioLine(m) ?? (s.swap ? m.sets.map((x) => x.reps ?? 0).join(' + ')
+          <span className="muted nums">{cardioLine(m) ?? (s.swap ? m.sets.map((x) => x.reps ?? 0).join(' + ')
             : s.type === 'GVT' ? blocks(m.sets).map(blockLabel).join(', ')
             : m.sets.filter((x) => x.done).map((x) => `${x.kind && x.kind !== 'working' ? `${x.kind[0].toUpperCase()} ` : ''}${x.weight ?? '–'}×${x.reps ?? '–'}`).join('  '))}</span></p>
       ))}
@@ -60,7 +60,7 @@ function InsightsModal({ g, data, onClose }: { g: Exclude<Group, { kind: 'day' }
         <h4>Est. 1RM by lift</h4>
         {r.lifts.length ? r.lifts.map((l) => (
           <p key={l.id} className="hist-line"><span>{l.pr ? '🏆 ' : ''}{l.name}</span>
-            <span>{l.e1rm} kg {l.change != null ? <small className={l.change > 0 ? 'up' : l.change < 0 ? 'down' : ''}>({sign(l.change)} vs previous)</small> : <small>(new)</small>}</span></p>
+            <span className="nums">{l.pr ? <b className="tick-num">{l.e1rm}</b> : l.e1rm} kg {l.change != null ? <small className={l.change > 0 ? 'up' : l.change < 0 ? 'down' : ''}>({sign(l.change)} vs previous)</small> : <small>(new)</small>}</span></p>
         )) : <p className="muted">No weighted sets this {g.kind}.</p>}
 
         <h4>Sets per muscle per week (target {data.settings.muscleTarget})</h4>
@@ -112,7 +112,7 @@ export default function History({ data }: { data: AppData }) {
           <button className={`chip ${view === 'movement' ? 'on' : ''}`} onClick={() => setView('movement')}>By movement</button>
         </div>
       </header>
-      {view === 'sessions' && (groups.length === 0 ? <p className="muted pad">No sessions yet.</p> : groups.map((g) =>
+      {view === 'sessions' && (groups.length === 0 ? <div className="empty"><h3>No sessions yet</h3><p>Finished workouts land here, grouped by week and month.</p></div> : groups.map((g) =>
         g.kind === 'day' ? <SessionCard key={g.session.id} s={g.session} /> : <Fold key={g.label} g={g} data={data} onInsights={setModal} />))}
       {view === 'movement' && (
         <>
@@ -124,7 +124,7 @@ export default function History({ data }: { data: AppData }) {
             const m = s.movements.find((x) => x.movementId === mid)!;
             return (
               <p key={s.id} className="card hist-line"><span>{new Date(s.date).toLocaleDateString()}</span>
-                <span>{s.type === 'GVT' ? blocks(m.sets).map(blockLabel).join(', ') : m.sets.filter((x) => x.done).map((x) => `${x.kind && x.kind !== 'working' ? `${x.kind[0].toUpperCase()} ` : ''}${x.weight ?? '–'}×${x.reps ?? '–'}`).join('  ')}</span></p>
+                <span className="nums">{s.type === 'GVT' ? blocks(m.sets).map(blockLabel).join(', ') : m.sets.filter((x) => x.done).map((x) => `${x.kind && x.kind !== 'working' ? `${x.kind[0].toUpperCase()} ` : ''}${x.weight ?? '–'}×${x.reps ?? '–'}`).join('  ')}</span></p>
             );
           })}
         </>

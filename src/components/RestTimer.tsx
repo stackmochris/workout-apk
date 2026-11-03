@@ -4,15 +4,21 @@ import { alerts } from '../lib/alerts';
 
 export interface RestCue { n: number; seconds: number; label?: string }
 
+const RING = 15;
+const RING_C = 2 * Math.PI * RING;
+
 /** Rest countdown. A new cue (n changes) restarts it; it starts by itself when a set is ticked. */
+
 export default function RestTimer({ cue, sound, vibrate }: { cue: RestCue; sound: boolean; vibrate: boolean }) {
   const [left, setLeft] = useState<number | null>(null);
+  const [total, setTotal] = useState(0);
   const endAt = useRef(0);
   const label = cue.label ?? 'Rest';
 
   useEffect(() => {
     if (cue.n > 0) {
       endAt.current = Date.now() + cue.seconds * 1000;
+      setTotal(cue.seconds);
       setLeft(cue.seconds);
       alerts.running(endAt.current, label);
     }
@@ -36,11 +42,18 @@ export default function RestTimer({ cue, sound, vibrate }: { cue: RestCue; sound
   if (left == null) return null;
   const mm = Math.floor(left / 60);
   const ss = String(left % 60).padStart(2, '0');
+  const remain = total > 0 ? left / total : 0;
   return (
-    <div className={`rest ${left <= 10 ? 'warn' : ''} ${left === 0 ? 'go' : ''}`}>
-      <span>{label}</span>
-      <strong>{left === 0 ? 'Go' : `${mm}:${ss}`}</strong>
-      <button onClick={() => { endAt.current += 15000; setLeft((l) => (l ?? 0) + 15); alerts.running(endAt.current, label); }}>+15s</button>
+    <div className={`rest ${left <= 10 ? 'warn' : ''} ${left === 0 ? 'go' : ''}`} role="timer" aria-label={`${label} ${left === 0 ? 'done' : `${mm}:${ss}`}`}>
+      <svg className="rest-ring" viewBox="0 0 40 40" aria-hidden="true">
+        <circle cx="20" cy="20" r={RING} className="bg" />
+        <circle cx="20" cy="20" r={RING} className="fill" strokeDasharray={RING_C} strokeDashoffset={RING_C * remain} />
+      </svg>
+      <div className="rest-copy">
+        <span>{label}</span>
+        <strong>{left === 0 ? 'Go' : `${mm}:${ss}`}</strong>
+      </div>
+      <button onClick={() => { endAt.current += 15000; setLeft((l) => (l ?? 0) + 15); setTotal((t) => t + 15); alerts.running(endAt.current, label); }}>+15s</button>
       <button onClick={() => { setLeft(null); alerts.cancel(); }}>Skip</button>
     </div>
   );

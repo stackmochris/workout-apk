@@ -106,8 +106,8 @@ export default function GvtTimer({ sets, reps, seconds, sound, vibrate, onFinish
       </svg>
       <div className="row">
         {phase !== 'done' && <button className="primary" onClick={toggle}>{phase === 'run' ? 'Pause' : phase === 'paused' ? 'Resume' : 'Start'}</button>}
-        <button onClick={reset}>Reset</button>
-        {onAdjust && phase !== 'done' && <button onClick={() => { release.current(); setPhase('idle'); onAdjust(log); }}>Adjust weight</button>}
+        <button className="ghost" onClick={reset}>Reset</button>
+        {onAdjust && phase !== 'done' && <button className="ghost" onClick={() => { release.current(); setPhase('idle'); onAdjust(log); }}>Adjust weight</button>}
       </div>
       {log.length > 0 && (
         <div className="replog">
