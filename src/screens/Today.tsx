@@ -356,37 +356,7 @@ export default function Today({ data, setData, prefs }: Props) {
             });
           }}
         />
-      ) : false && plan.type === 'GVT' ? (
-        <div className="card gvt-card">
-          {!gvtPicks && !draft.movements.slice(0, 3).some((m) => doneSets(m) > 0) ? (
-            <>
-              <h3>Pick 3 movements</h3>
-              <div className="chips">
-                {data.movements.filter((m) => m.focus === plan.focus).map((m) => {
-                  const on = draft.movements.slice(0, 3).some((x) => x.movementId === m.id);
-                  return (
-                    <button key={m.id} className={`chip ${on ? 'on' : ''}`} onClick={() => {
-                      const cur = draft.movements.slice(0, 3);
-                      const nextList = on ? cur.filter((x) => x.movementId !== m.id) : [...cur, blank({ ...m, sets: 1 })].slice(-3);
-                      saveDraft(nextList);
-                    }}>{m.name}</button>
-                  );
-                })}
-              </div>
-              <button className="primary wide" disabled={draft.movements.slice(0, 3).length !== 3} onClick={() => setGvtPicks(draft.movements.slice(0, 3).map((m) => m.movementId))}>
-                Start GVT
-              </button>
-            </>
-          ) : gvtRun ? (
-            <>
-              <h3>{draft.movements[gvtRun.index].name}</h3>
-              <p className="muted">{gvtRun.weight ?? '\u2013'} kg{doneSets(draft.movements[gvtRun.index]) ? ` \u00b7 ${blocks(draft.movements[gvtRun.index].sets).map(blockLabel).join(', ')} logged` : ''}</p>
-              <GvtTimer key={`${gvtRun.index}-${doneSets(draft.movements[gvtRun.index])}`} {...data.settings.gvt} sound={data.settings.sound} vibrate={data.settings.vibrate}
-                startAt={doneSets(draft.movements[gvtRun.index])} weight={gvtRun.weight} autoStart
-                onAdjust={(reps) => { logGvt(gvtRun.index, gvtRun.weight, reps); setGvtKg((k) => ({ ...k, [gvtRun.index]: null })); setGvtRun(null); }}
-                onFinish={(reps) => { logGvt(gvtRun.index, gvtRun.weight, reps); setGvtRun(null); }} />
-            </>
-          ) : (
+      ) : (
             <>
               {draft.movements.slice(0, 3).map((lm, mi) => {
                 const done = doneSets(lm);
