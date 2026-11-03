@@ -60,7 +60,8 @@ export default function Today({ data, setData, prefs }: Props) {
   const [gvtRun, setGvtRun] = useState<{ index: number; weight: number | null } | null>(null);
   const [gvtKg, setGvtKg] = useState<Record<number, number | null>>({});
   const byId = useMemo(() => new Map(data.movements.map((m) => [m.id, m])), [data.movements]);
-  const [picker, setPicker] = useState<{ mode: 'add' | 'swap'; index?: number } | null>(null);
+  const [picker, setPicker] = useState<{ mode: 'add' | 'swap' | 'superset'; index?: number } | null>(null);
+  const [ssPick, setSsPick] = useState<{ index: number; selected: number[] } | null>(null);
   const [rest, setRest] = useState<RestCue>({ n: 0, seconds: 0 });
   const [gvtPicks, setGvtPicks] = useState<string[] | null>(null);
   const [swapping, setSwapping] = useState(false);
@@ -224,15 +225,22 @@ export default function Today({ data, setData, prefs }: Props) {
   const setKind = (mi: number, si: number, kind: SetKind) =>
     saveDraft(draft.movements.map((m, i) => i !== mi ? m : { ...m, sets: m.sets.map((x, j) => j === si ? { ...x, kind: kind === 'working' ? undefined : kind } : x) }));
 
-  const toggleSuperset = (mi: number) => {
+  const startSuperset = (mi: number) => {
     const lm = draft.movements[mi];
     if (lm.superset) {
       const g = lm.superset;
       saveDraft(draft.movements.map((m) => (m.superset === g ? { ...m, superset: undefined } : m)));
-    } else if (mi + 1 < draft.movements.length) {
-      const g = draft.movements[mi + 1].superset ?? uid();
-      saveDraft(draft.movements.map((m, i) => (i === mi || i === mi + 1 ? { ...m, superset: g } : m)));
+      return;
     }
+    setSsPick({ index: mi, selected: [] });
+  };
+
+  const confirmSuperset = () => {
+    if (!ssPick) return;
+    const g = uid();
+    const ids = new Set([ssPick.index, ...ssPick.selected]);
+    saveDraft(draft.movements.map((m, i) => ids.has(i) ? { ...m, superset: g } : m));
+    setSsPick(null);
   };
 
   
@@ -371,7 +379,11 @@ export default function Today({ data, setData, prefs }: Props) {
             const ssIndex = lm.superset ? draft.movements.filter((m) => m.superset === lm.superset).findIndex((m) => m === lm) : -1;
             return (
               <article key={mi} className={`card mv ${complete ? 'complete' : active ? 'active' : ''} ${flagged ? 'flagged' : ''} ${lm.superset ? 'superset' : ''}`}>
-                {lm.superset && <span className="ss-tag">Superset {String.fromCharCode(65 + ssIndex)}</span>}
+                {lm.superset && (
+                  <span className="ss-tag">
+                    {draft.movements.filter((m) => m.superset === lm.superset).map((m) => m.name).join(' → ')}
+                  </span>
+                )}
                 <div className="mv-head" onClick={() => complete && setCollapsed((c) => ({ ...c, [mi]: !c[mi] }))} style={complete ? { cursor: 'pointer' } : undefined}>
                   <div>
                     <h3>{lm.name}{complete ? (collapsed[mi] === false ? ' ▾' : ' ▸') : ''}</h3>
@@ -477,9 +489,7 @@ export default function Today({ data, setData, prefs }: Props) {
                   <div className="mv-actions" style={{ margin: '6px 0 0' }}>
                     <span className="mv-actions-group">
                       <button className="chip" onClick={() => saveDraft(draft.movements.map((m, i) => i === mi ? { ...m, sets: [...m.sets, { reps: null, weight: null, done: false }] } : m))}>+ Set</button>
-                      {(lm.superset || mi + 1 < draft.movements.length) && (
-                        <button className="chip" onClick={() => toggleSuperset(mi)}>{lm.superset ? 'Unlink' : 'Superset'}</button>
-                      )}
+                      <button className={`chip ${lm.superset ? 'on' : ''}`} onClick={() => startSuperset(mi)}>{lm.superset ? 'Unlink' : 'Superset'}</button>
                       <button className="chip" onClick={() => saveDraft(draft.movements.filter((_, i) => i !== mi))}>Remove</button>
                     </span>
                     {complete
@@ -530,6 +540,29 @@ export default function Today({ data, setData, prefs }: Props) {
         />
       )}
     
+      
+      {ssPick && (
+        <div className="sheet" onClick={() => setSsPick(null)}>
+          <div className="sheet-body" onClick={(e) => e.stopPropagation()}>
+            <h3>Superset with</h3>
+            <p className="muted">Pick one or more. They run back-to-back as one set, then you rest.</p>
+            <div className="chips">
+              {draft.movements.map((m, i) => i === ssPick.index ? null : (
+                <button key={i} className={`chip ${ssPick.selected.includes(i) ? 'on' : ''}`}
+                  onClick={() => setSsPick({ ...ssPick, selected: ssPick.selected.includes(i) ? ssPick.selected.filter((x) => x !== i) : [...ssPick.selected, i] })}>
+                  {m.name}
+                </button>
+              ))}
+            </div>
+            <button className="ghost wide" onClick={() => { setPicker({ mode: 'add' }); }}>Add a new movement</button>
+            <div className="row" style={{ marginTop: 12 }}>
+              <button className="ghost" onClick={() => setSsPick(null)}>Cancel</button>
+              <button className="primary" disabled={ssPick.selected.length === 0} onClick={confirmSuperset}>Link</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {checkin && (
         <div className="sheet" role="dialog">
           <div className="sheet-body">
