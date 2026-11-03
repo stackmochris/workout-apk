@@ -27,8 +27,15 @@ export function beep(type: Tone) {
   }
 }
 
+/** Feature-detected haptic. No-ops where Vibration API is missing, including iOS Safari. */
 export function buzz(pattern: number | number[]) {
-  if ('vibrate' in navigator) navigator.vibrate(pattern);
+  try {
+    const vibrate = navigator.vibrate?.bind(navigator);
+    if (typeof vibrate !== 'function') return;
+    vibrate(pattern);
+  } catch {
+    /* unsupported */
+  }
 }
 
 export async function wakeLock(): Promise<() => void> {

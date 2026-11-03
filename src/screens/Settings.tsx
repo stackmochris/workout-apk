@@ -58,15 +58,13 @@ export default function SettingsScreen({ data, setData }: Props) {
     <section>
       <header className="hero"><small>Preferences</small><h1>Settings</h1></header>
       <div className="card form">
-        
-      <div className="card form">
         <h3>Your name</h3>
         <p className="muted">Stored on this phone. Firebase is only needed when others need to see it.</p>
         <label>Name
           <input value={s.displayName ?? ''} onChange={(e) => set({ displayName: e.target.value })} placeholder="e.g. Chris" />
         </label>
       </div>
-
+      <div className="card form">
         <h3>Visual customization</h3>
         <p className="muted small">Hero background packs</p>
         <div className="chips">
@@ -89,8 +87,6 @@ export default function SettingsScreen({ data, setData }: Props) {
         </div>
       </div>
       <div className="card form">
-        
-      <div className="card form">
         <h3>Cardio priority</h3>
         <p className="muted">What the cardio cards should emphasise.</p>
         <div className="chips">
@@ -99,7 +95,7 @@ export default function SettingsScreen({ data, setData }: Props) {
           ))}
         </div>
       </div>
-
+      <div className="card form">
         <h3>Timers</h3>
         <label>Rest (seconds)<input inputMode="numeric" value={s.restSeconds} onChange={(e) => set({ restSeconds: num(e.target.value, 90) })} /></label>
         <label>GVT sets<input inputMode="numeric" value={s.gvt.sets} onChange={(e) => set({ gvt: { ...s.gvt, sets: num(e.target.value, 10) } })} /></label>
@@ -164,7 +160,7 @@ export default function SettingsScreen({ data, setData }: Props) {
             <span>{sn.day} \u00b7 {sn.sessions} sessions</span>
             <button className="ghost" onClick={() => { const d = readSnapshot(sn.key); if (d) restore(d, `the ${sn.day} backup`); }}>Restore</button>
           </p>
-        )) : <p className="muted small">None yet. The first one is saved after you log something.</p>}
+        )) : <div className="empty"><h3>No backups yet</h3><p>The first one is saved after you log something.</p></div>}
         <button className="ghost wide" onClick={() => { if (confirm('Erase all local data on this device? Export first if you want a copy.')) setData(freshData()); }}>Reset all data</button>
       </div>
       <p className="version">Workout Tracker {VERSION}</p>

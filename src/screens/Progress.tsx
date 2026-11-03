@@ -37,9 +37,9 @@ export default function Progress({ data, setData }: Props) {
               {(Object.keys(METRIC) as Metric[]).map((m) => <button key={m} className={`chip ${metric === m ? 'on' : ''}`} onClick={() => setMetric(m)}>{METRIC[m]}</button>)}
             </div>
             <LineChart points={series.map((p) => ({ x: new Date(p.date).getTime(), y: p[metric] }))} unit="kg" />
-            {best != null && <p className="muted">Best estimated 1RM {best} kg (Epley, warm-ups excluded)</p>}
+            {best != null && <p className="muted">Best estimated 1RM <b className="tick-num">{best}</b> kg (Epley, warm-ups excluded)</p>}
           </>
-        ) : <p className="muted">Log a weighted set to see charts.</p>}
+        ) : <div className="empty"><h3>No lifts yet</h3><p>Log a weighted set and the chart will show up here.</p></div>}
       </div>
 
       <div className="card">

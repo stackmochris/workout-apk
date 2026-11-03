@@ -325,26 +325,25 @@ export default function Today({ data, setData, prefs }: Props) {
         <h1>{plan.focus === 'NoGym' ? 'No Gym' : plan.focus}</h1>
         <div className="pills">
           <span className={`pill ${plan.type}`}>{plan.type}</span>
-          <span className="pill dim">Cycle {plan.cycleStep}/3</span>
-          {plan.type === 'Normal' && <span className="pill dim">{doneCount}/{draft.movements.length} done</span>}
-          {draft.startedAt && <span className="pill">{elapsedLabel}</span>}
+          <span className="pill">Cycle {plan.cycleStep}/3</span>
+          {plan.type === 'Normal' && <span className="pill">{doneCount}/{draft.movements.length} done</span>}
+          {draft.startedAt && <span className="pill time">{elapsedLabel}</span>}
         </div>
+      </header>
+      <div className="card plan">
         <div className="browse">
           <select aria-label="Browse focus" value={plan.focus} onChange={(e) => { setGvtPicks(null); setGvtRun(null); const f = e.target.value as Focus; setBrowse(f === planned.focus && plan.type === planned.type ? null : { focus: f, type: plan.type }); }}>
             {FOCI.map((f) => <option key={f} value={f}>{f === 'NoGym' ? 'No Gym' : f}</option>)}
           </select>
-          
           {browse && <button className="ghost" onClick={() => { setBrowse(null); setGvtPicks(null); setGvtRun(null); }}>Back to today</button>}
-        </div>
-        <div className="row" style={{ marginTop: 8 }}>
           {!draft.startedAt
-            ? <button className="chip" onClick={startTimer}>Start workout</button>
-            : <button className="chip" onClick={stopTimer}>Stop timer</button>}
+            ? <button className="primary" onClick={startTimer}>Start workout</button>
+            : <button className="ghost" onClick={stopTimer}>Stop timer</button>}
         </div>
         {!onPlan && <p className="muted small">Browsing. Logging this won't move the rotation.</p>}
         {tired.length > 0 && <p className="recovery">Probably still recovering: {tired.map(label).join(', ')}. Go lighter on those or pick another focus.</p>}
         <p className="next">Up next: {next.map((n) => `${n.focus} \u00b7 ${n.type}`).join('  →  ')}</p>
-      </header>
+      </div>
 
       {penalty.multiplier > 0 && (
         <div className="banner penalty" role="status">
@@ -386,8 +385,9 @@ export default function Today({ data, setData, prefs }: Props) {
             const sug = mv ? suggestNext(mv, prev?.sets, { bar: data.settings.barKg, plates: data.settings.plates, extraReps: pen.elbowReps }) : { weight: null, reps: null, reason: 'none' as const };
             const sugP = penalisedHint(mv, { weight: sug.weight, reps: sug.reps }, penalty.multiplier, pen);
             const ssIndex = lm.superset ? draft.movements.filter((m) => m.superset === lm.superset).findIndex((m) => m === lm) : -1;
+            const isPr = beats(bestWorking(lm.sets), prev ? bestWorking(prev.sets) : null);
             return (
-              <article key={mi} className={`card mv ${complete ? 'complete' : active ? 'active' : ''} ${flagged ? 'flagged' : ''} ${lm.superset ? 'superset' : ''}`}>
+              <article key={mi} className={`card mv ${complete ? 'complete' : active ? 'active' : ''} ${isPr ? 'pr' : ''} ${flagged ? 'flagged' : ''} ${lm.superset ? 'superset' : ''}`}>
                 {lm.superset && (
                   <span className="ss-tag">
                     {draft.movements.filter((m) => m.superset === lm.superset).map((m) => m.name).join(' → ')}
@@ -395,7 +395,7 @@ export default function Today({ data, setData, prefs }: Props) {
                 )}
                 <div className="mv-head" onClick={() => complete && setCollapsed((c) => ({ ...c, [mi]: !c[mi] }))} style={complete ? { cursor: 'pointer' } : undefined}>
                   <div>
-                    <h3>{lm.name}{complete ? (collapsed[mi] === false ? ' ▾' : ' ▸') : ''}</h3>
+                    <h3><span>{lm.name}{complete ? (collapsed[mi] === false ? ' ▾' : ' ▸') : ''}</span>{isPr && <span className="pr-pill">PR</span>}</h3>
                     <small>{mv ? displayTarget(mv, data.settings.goal, data.settings.prescriptions?.[mv.id]) : ''}{prev?.notes ? ` · Last: ${prev.notes}` : ''}</small>
                   </div>
                 </div>
@@ -431,7 +431,7 @@ export default function Today({ data, setData, prefs }: Props) {
                     {mv?.equipment === 'barbell' && sugP.weight != null && <span className="plates">{plateLabel(plateLoad(sugP.weight, data.settings.barKg, data.settings.plates))}</span>}
                   </p>
                 )}
-                {flagged && mv!.flags.map((f) => <p key={f} className="flag">\u26a0 {FLAG_INFO[f]?.reminder ?? f}</p>)}
+                {flagged && mv!.flags.map((f) => <p key={f} className="flag">{'\u26a0'} {FLAG_INFO[f]?.reminder ?? f}</p>)}
                 {lm.gvt ? (
                   <div>
                     {blocks(lm.sets).length > 0 && (
@@ -530,9 +530,9 @@ export default function Today({ data, setData, prefs }: Props) {
           });
           })()}
           {draft.movements.length === 0 && (
-            <div className="card" style={{ textAlign: 'center', padding: '24px 16px' }}>
-              <h3 style={{ margin: '0 0 6px' }}>Freestyle</h3>
-              <p className="muted">No movements yet. Add what you want to do today.</p>
+            <div className="empty">
+              <h3>Freestyle</h3>
+              <p>No movements yet. Add what you want to do today.</p>
             </div>
           )}
           <button className="ghost wide" onClick={() => setPicker({ mode: 'add' })}>+ Add movement</button>
@@ -652,7 +652,7 @@ function Picker({ movements, focus, onPick }: { movements: Movement[]; focus: st
       </div>
       <ul className="pick">
         {list.map((m) => <li key={m.id}><button onClick={() => onPick(m)}>{m.name}<small>{m.focus} · {m.target}</small></button></li>)}
-        {!list.length && <li className="muted pad">Nothing matches.</li>}
+        {!list.length && <li className="empty"><h3>Nothing matches</h3><p>Try another search or category.</p></li>}
       </ul>
     </>
   );
@@ -660,4 +660,20 @@ function Picker({ movements, focus, onPick }: { movements: Movement[]; focus: st
 
 function short(name: string) {
   return name.split('(')[0].trim().slice(0, 18);
+}
+
+function bestWorking(sets: LoggedMovement['sets']) {
+  let best: { weight: number; reps: number } | null = null;
+  for (const s of sets) {
+    if (!s.done || s.reps == null || (s.kind ?? 'working') !== 'working') continue;
+    const weight = s.weight ?? 0;
+    if (!best || weight > best.weight || (weight === best.weight && s.reps > best.reps)) best = { weight, reps: s.reps };
+  }
+  return best;
+}
+
+function beats(cur: { weight: number; reps: number } | null, prev: { weight: number; reps: number } | null) {
+  if (!cur) return false;
+  if (!prev) return true;
+  return cur.weight > prev.weight || (cur.weight === prev.weight && cur.reps > prev.reps);
 }
