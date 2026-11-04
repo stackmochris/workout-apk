@@ -1,4 +1,5 @@
 import { initialRotation } from './rotation';
+import { normalizeSupersetGroups } from './superset';
 import { DEFAULT_PENALTY } from './week';
 import { SEED_MOVEMENTS } from '../data/movements';
 import { BodyEntry, LoggedMovement, Movement, RotationState, Session, Settings, Theme } from '../types';
@@ -62,7 +63,11 @@ export function migrate(raw: unknown): AppData {
     version: 2,
     movements,
     rotation: d.rotation ?? fresh.rotation,
-    sessions: Array.isArray(d.sessions) ? d.sessions : [],
+    sessions: Array.isArray(d.sessions)
+      ? d.sessions.map((s) => (s && Array.isArray(s.movements) ? { ...s, movements: normalizeSupersetGroups(s.movements) } : s))
+      : [],
+    // Superset stays a shared id. Lone ids (a partner was removed) are cleared so the card is a normal movement.
+    draft: d.draft && typeof d.draft === 'object' ? { ...d.draft, movements: normalizeSupersetGroups(d.draft.movements) } : d.draft ?? null,
     body: Array.isArray(d.body) ? d.body : [],
     settings: {
       ...DEFAULT_SETTINGS,

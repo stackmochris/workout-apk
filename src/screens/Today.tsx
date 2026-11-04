@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
 import { completeSession, currentPlan, preview, skipSession } from '../engine/rotation';
 import { DEFAULT_DAY, FLAG_INFO, SWAP_DEFAULTS } from '../data/movements';
 import { penalisedHint, penaltyState } from '../engine/week';
@@ -20,6 +20,7 @@ import { FOCI, Focus, SessionType } from '../types';
 import FinishSheet from '../components/FinishSheet';
 import { computeSessionStats, SessionStats } from '../engine/sessionStats';
 import { displayTarget } from '../engine/prescription';
+import { addLibraryMovement, memberIndexes, mergeMovement, moveBlock, movementsToRecord, removeGroup, removeMovement, setMark, supersetLetter, unlinkAll, unlinkMovement } from '../engine/superset';
 import { Goal, Prescription } from '../types';
 
 
@@ -60,8 +61,8 @@ export default function Today({ data, setData, prefs }: Props) {
   const [gvtRun, setGvtRun] = useState<{ index: number; weight: number | null } | null>(null);
   const [gvtKg, setGvtKg] = useState<Record<number, number | null>>({});
   const byId = useMemo(() => new Map(data.movements.map((m) => [m.id, m])), [data.movements]);
-  const [picker, setPicker] = useState<{ mode: 'add' | 'swap' | 'superset'; index?: number } | null>(null);
-  const [ssPick, setSsPick] = useState<{ index: number; selected: number[] } | null>(null);
+  const [picker, setPicker] = useState<{ mode: 'add' | 'swap'; index?: number } | null>(null);
+  const [ssPick, setSsPick] = useState<{ index: number } | null>(null);
   const [rest, setRest] = useState<RestCue>({ n: 0, seconds: 0 });
   const [gvtPicks, setGvtPicks] = useState<string[] | null>(null);
   const [swapping, setSwapping] = useState(false);
@@ -114,7 +115,7 @@ export default function Today({ data, setData, prefs }: Props) {
       }
       if (hasWork && (idle > 5 * 3600_000 || open > 36 * 3600_000)) {
         const now = new Date().toISOString();
-        const ordered = byPerformed(d.movements.filter((m) => m.finished || m.durationMin || m.distanceKm || m.sets.some((s) => s.done)));
+        const ordered = movementsToRecord(d.movements);
         const session: Session = {
           id: uid(), date: now, focus: d.focus as Focus, type: d.type as SessionType, status: 'completed',
           movements: ordered, author: 'app', updatedAt: now,
@@ -148,7 +149,8 @@ export default function Today({ data, setData, prefs }: Props) {
   };
 
   const finishMovement = (mi: number) => {
-    saveDraft(draft.movements.map((m, i) => i === mi ? { ...m, finished: true } : m));
+    const ids = new Set(memberIndexes(draft.movements, mi));
+    saveDraft(draft.movements.map((m, i) => ids.has(i) ? { ...m, finished: true } : m));
     setCollapsed((c) => ({ ...c, [mi]: true }));
   };
   const saveCheckin = () => {
@@ -169,8 +171,14 @@ export default function Today({ data, setData, prefs }: Props) {
   };
 
   const reopenMovement = (mi: number) => {
-    saveDraft(draft.movements.map((m, i) => i === mi ? { ...m, finished: false } : m));
+    const ids = new Set(memberIndexes(draft.movements, mi));
+    saveDraft(draft.movements.map((m, i) => ids.has(i) ? { ...m, finished: false } : m));
     setCollapsed((c) => ({ ...c, [mi]: false }));
+  };
+
+  const addRound = (mi: number) => {
+    const ids = new Set(memberIndexes(draft.movements, mi));
+    saveDraft(draft.movements.map((m, i) => ids.has(i) ? { ...m, sets: [...m.sets, { reps: null, weight: null, done: false }] } : m));
   };
 
   const savePrescription = (id: string, patch: Prescription) => {
@@ -211,8 +219,8 @@ export default function Today({ data, setData, prefs }: Props) {
     const lm = movements[mi];
     const group = lm.superset ? movements.map((m, i) => ({ m, i })).filter((x) => x.m.superset === lm.superset) : [];
     if (group.length > 1) {
-      const pending = group.filter((x) => !x.m.sets[si]?.done);
-      if (pending.length) return; // more movements in this set — no rest
+      const round = group.filter((x) => x.m.sets[si]);
+      if (round.some((x) => !x.m.sets[si].done)) return; // A1 then B1, rest only after the round
       setRest((r) => ({ n: r.n + 1, seconds: full, label: `Rest → ${short(group[0].m.name)}` }));
       return;
     }
@@ -222,48 +230,34 @@ export default function Today({ data, setData, prefs }: Props) {
   const setKind = (mi: number, si: number, kind: SetKind) =>
     saveDraft(draft.movements.map((m, i) => i !== mi ? m : { ...m, sets: m.sets.map((x, j) => j === si ? { ...x, kind: kind === 'working' ? undefined : kind } : x) }));
 
-  const startSuperset = (mi: number) => setSsPick({ index: mi, selected: [] });
+  const openSuperset = (mi: number) => setSsPick({ index: mi });
 
-  const addToSuperset = (primary: number, partners: number[]) => {
-    const g = draft.movements[primary].superset ?? uid();
-    const ids = new Set([primary, ...partners]);
-    saveDraft(draft.movements.map((m, i) => ids.has(i) ? { ...m, superset: g } : m));
+  const joinExisting = (partnerIndex: number) => {
+    if (!ssPick) return;
+    const result = mergeMovement(draft.movements, ssPick.index, partnerIndex, uid());
+    saveDraft(result.movements);
+    setSsPick({ index: result.anchorIndex });
   };
 
-  const unlinkOne = (mi: number) => {
-    const g = draft.movements[mi].superset;
-    if (!g) return;
-    const left = draft.movements.filter((m, i) => i !== mi && m.superset === g).length;
-    saveDraft(draft.movements.map((m, i) => (i === mi || (left <= 1 && m.superset === g)) ? { ...m, superset: undefined } : m));
+  const joinLibrary = (m: Movement) => {
+    if (!ssPick) return;
+    const result = addLibraryMovement(draft.movements, ssPick.index, blank(m), uid());
+    saveDraft(result.movements);
+    setSsPick({ index: result.anchorIndex });
   };
 
-  const unlinkAll = (mi: number) => {
-    const g = draft.movements[mi].superset;
-    if (!g) return;
-    saveDraft(draft.movements.map((m) => m.superset === g ? { ...m, superset: undefined } : m));
-  };
+  const unlinkAt = (index: number) => saveDraft(unlinkMovement(draft.movements, index));
 
-  
-  const byPerformed = (list: LoggedMovement[]) =>
-    [...list].sort((a, b) => {
-      const ta = a.performedAt ? new Date(a.performedAt).getTime() : Infinity;
-      const tb = b.performedAt ? new Date(b.performedAt).getTime() : Infinity;
-      return ta - tb;
-    });
-
-  const moveCard = (mi: number, dir: -1 | 1) => {
-    const next = mi + dir;
-    if (next < 0 || next >= draft.movements.length) return;
-    const list = [...draft.movements];
-    [list[mi], list[next]] = [list[next], list[mi]];
-    saveDraft(list);
+  const unlinkGroup = (index: number) => {
+    saveDraft(unlinkAll(draft.movements, index));
+    setSsPick(null);
   };
 
   const requestFinish = (status: Session['status'], extra: Partial<Session> = {}) => {
     const now = new Date().toISOString();
     const session: Session = {
       id: uid(), date: now, focus: plan.focus, type: plan.type, status,
-      movements: status === 'completed' ? byPerformed(draft.movements.filter((m) => m.finished || m.durationMin || m.distanceKm || m.sets.some((s) => s.done) || extra.gvtRepsPerMinute)) : [],
+      movements: status === 'completed' ? movementsToRecord(draft.movements, { keepAll: !!extra.gvtRepsPerMinute }) : [],
       author: 'app', updatedAt: now,
       durationMin: draft.startedAt ? Math.max(1, Math.round((Date.now() - new Date(draft.startedAt).getTime()) / 60000)) : undefined,
       ...extra,
@@ -301,13 +295,8 @@ export default function Today({ data, setData, prefs }: Props) {
 
   const pick = (m: Movement) => {
     if (!picker) return;
-    if (picker.mode === 'superset' && ssPick) {
-      const g = draft.movements[ssPick.index].superset ?? uid();
-      const next = draft.movements.map((x, i) => i === ssPick.index ? { ...x, superset: g } : x);
-      next.push({ ...blank(m), superset: g });
-      saveDraft(next);
-    } else if (picker.mode === 'add') saveDraft([...draft.movements, blank(m)]);
-    else saveDraft(draft.movements.map((x, i) => (i === picker.index ? blank(m) : x)));
+    if (picker.mode === 'add') saveDraft([...draft.movements, blank(m)]);
+    else if (picker.index != null) saveDraft(draft.movements.map((x, i) => (i === picker.index ? { ...blank(m), superset: x.superset } : x)));
     setPicker(null);
   };
 
@@ -317,6 +306,109 @@ export default function Today({ data, setData, prefs }: Props) {
   const label = (id: string) => MUSCLES.find((m) => m.id === id)?.label ?? id;
   const doneCount = draft.movements.filter((m) => m.finished || m.durationMin || m.distanceKm || (m.sets.length && m.sets.every((s) => s.done))).length;
   const bodyKg = [...data.body].reverse().find((b) => b.weight)?.weight ?? 80;
+
+  const movementFacts = (lm: LoggedMovement) => {
+    const mv = byId.get(lm.movementId);
+    const prev = previousFor(data.sessions, lm.movementId);
+    const flagged = !!mv?.flags.length;
+    const sug = mv
+      ? suggestNext(mv, prev?.sets, { bar: data.settings.barKg, plates: data.settings.plates, extraReps: pen.elbowReps })
+      : { weight: null as number | null, reps: null as number | null, reason: 'none' as const };
+    const sugP = penalisedHint(mv, { weight: sug.weight, reps: sug.reps }, penalty.multiplier, pen);
+    const isPr = beats(bestWorking(lm.sets), prev ? bestWorking(prev.sets) : null);
+    return { mv, prev, flagged, sug, sugP, isPr };
+  };
+
+  const renderWork = (lm: LoggedMovement, mi: number, mark?: (setIndex: number) => string) => {
+    const { mv, prev, flagged, sug, sugP } = movementFacts(lm);
+    return (
+      <>
+        {mv && editing === mv.id && (
+          <div className="row" style={{ margin: '8px 0', gap: 6 }}>
+            <input style={{ width: 60 }} inputMode="numeric" placeholder="sets" defaultValue={data.settings.prescriptions?.[mv.id]?.sets ?? mv.sets}
+              onBlur={(e) => savePrescription(mv.id, { sets: e.target.value ? Number(e.target.value) : undefined })} />
+            <input style={{ width: 70 }} inputMode="numeric" placeholder="min" defaultValue={data.settings.prescriptions?.[mv.id]?.repMin ?? mv.repMin ?? ''}
+              onBlur={(e) => savePrescription(mv.id, { repMin: e.target.value ? Number(e.target.value) : null })} />
+            <input style={{ width: 70 }} inputMode="numeric" placeholder="max" defaultValue={data.settings.prescriptions?.[mv.id]?.repMax ?? mv.repMax ?? ''}
+              onBlur={(e) => savePrescription(mv.id, { repMax: e.target.value ? Number(e.target.value) : null })} />
+            <input style={{ flex: 1 }} placeholder="notes" defaultValue={data.settings.prescriptions?.[mv.id]?.notes ?? mv.notes ?? ''}
+              onBlur={(e) => savePrescription(mv.id, { notes: e.target.value || undefined })} />
+            <button className="ghost" onClick={() => { savePrescription(mv.id, {}); setEditing(null); }}>Done</button>
+          </div>
+        )}
+        {sug.reason !== 'none' && (
+          <p className="suggest">
+            <b>Next: {sugP.weight != null ? `${sugP.weight} kg \u00d7 ` : ''}{sugP.reps}</b>
+            <span>{sug.reason === 'add-weight' ? 'Top of range hit. Add weight' : sug.reason === 'add-reps' ? 'Add a rep' : 'Repeat'}{sugP.addedKg || sugP.addedReps ? ' (incl. penalty)' : ''}</span>
+            {mv?.equipment === 'barbell' && sugP.weight != null && <span className="plates">{plateLabel(plateLoad(sugP.weight, data.settings.barKg, data.settings.plates))}</span>}
+          </p>
+        )}
+        {flagged && mv!.flags.map((f) => <p key={f} className="flag">{'\u26a0'} {FLAG_INFO[f]?.reminder ?? f}</p>)}
+        {lm.gvt ? (
+          <div>
+            {blocks(lm.sets).length > 0 && (
+              <p className="muted" style={{ margin: '4px 0 8px' }}>
+                {blocks(lm.sets).map(blockLabel).join(' · ')}
+              </p>
+            )}
+            <div className="gvt-start" style={{ marginBottom: 8 }}>
+              <NumInput kind="kg" label={`${lm.name} kg`} value={gvtKg[mi] ?? null}
+                placeholder={(() => { const p = previousFor(data.sessions, lm.movementId); const w = p ? [...p.sets].reverse().find((x) => x.done && x.weight != null)?.weight : undefined; return w != null ? String(w) : 'kg'; })()}
+                onChange={(n) => setGvtKg((k) => ({ ...k, [mi]: n }))} />
+            </div>
+            <GvtTimer key={`${mi}-${doneSets(lm)}`} {...data.settings.gvt} sound={data.settings.sound} vibrate={data.settings.vibrate}
+              startAt={doneSets(lm)} weight={gvtKg[mi] ?? null}
+              onFinish={(reps) => { logGvt(mi, gvtKg[mi] ?? null, reps); setGvtKg((k) => ({ ...k, [mi]: null })); }}
+              onAdjust={(reps) => { logGvt(mi, gvtKg[mi] ?? null, reps); setGvtKg((k) => ({ ...k, [mi]: null })); }} />
+          </div>
+        ) : isCardio(lm.name) ? (
+          <div className="cardio-inputs" style={{ margin: '8px 0' }}>
+            <div className="row" style={{ gap: 8 }}>
+              <label className="form" style={{ flex: 1 }}>
+                Time (min)
+                <input type="number" inputMode="decimal" value={lm.durationMin ?? ''} placeholder="e.g. 30"
+                  onChange={(e) => setCardio(mi, { durationMin: e.target.value ? Number(e.target.value) : undefined })} />
+              </label>
+              <label className="form" style={{ flex: 1 }}>
+                Distance (km)
+                <input type="number" inputMode="decimal" step="0.1" value={lm.distanceKm ?? ''} placeholder="e.g. 5"
+                  onChange={(e) => setCardio(mi, { distanceKm: e.target.value ? Number(e.target.value) : undefined })} />
+              </label>
+            </div>
+            <p className="muted" style={{ marginTop: 6 }}>
+              {paceLabel(lm.durationMin, lm.distanceKm) ?? 'Avg pace —'}
+              {' · '}
+              {kcalLabel(lm.name, lm.durationMin, bodyKg) ?? 'Calories —'}
+              {bodyKg !== 80 ? ` (at ${bodyKg} kg)` : ' (est. at 80 kg)'}
+              {data.settings.cardioGoal && data.settings.cardioGoal !== 'maintenance' ? ` · Priority: ${data.settings.cardioGoal}` : ''}
+            </p>
+          </div>
+        ) : (
+          <div className="sets">
+            <div className="sets-h"><span>Set</span><span>kg</span><span>Reps</span><span /></div>
+            {lm.sets.map((s, si) => {
+              const prevSet = prev?.sets[si];
+              const base = (s.kind ?? 'working') !== 'working' || sug.reason === 'none' ? prevSet : { weight: sug.weight, reps: sug.reps };
+              const p = base ? penalisedHint(mv, base, penalty.multiplier, pen) : { weight: null, reps: (s.kind ?? 'working') === 'working' ? mv?.repMin ?? null : null };
+              const dropHint = s.kind === 'drop' ? suggestDrop(prevSet, s.dropStart ?? s.weight) : null;
+              const setLabel = mark?.(si);
+              return (
+                <Fragment key={si}>
+                  <SetRow index={si} s={s} hint={p} label={setLabel}
+                    onEdit={(patch) => updateSet(mi, si, patch)}
+                    onKind={(k) => setKind(mi, si, k)}
+                    onTick={() => updateSet(mi, si, s.done ? { reps: null } : { reps: s.reps ?? p.reps ?? null, weight: s.weight ?? p.weight ?? null })} />
+                  {dropHint?.end != null && s.dropEnd == null && (
+                    <p className="muted small" style={{ margin: '2px 0 6px 44px' }}>Drop to ~{dropHint.end} kg{dropHint.dropKg ? ` (\u2212${dropHint.dropKg} kg)` : ''}</p>
+                  )}
+                </Fragment>
+              );
+            })}
+          </div>
+        )}
+      </>
+    );
+  };
 
   return (
     <section>
@@ -371,157 +463,103 @@ export default function Today({ data, setData, prefs }: Props) {
       ) : (
         <>
           {(() => {
-          const indexed = draft.movements.map((lm, mi) => ({ lm, mi, complete: !!lm.finished || (lm.sets.length > 0 && lm.sets.every((s) => s.done)) }));
+          const movementDone = (m: LoggedMovement) => !!m.finished || (m.sets.length > 0 && m.sets.every((s) => s.done));
+          const indexed = draft.movements.map((lm, mi) => ({
+            lm, mi,
+            complete: memberIndexes(draft.movements, mi).every((i) => movementDone(draft.movements[i])),
+          }));
           const ordered = [...indexed.filter((x) => !x.complete), ...indexed.filter((x) => x.complete)];
           return ordered.filter(({ lm, mi }) => {
             if (!lm.superset) return true;
             const first = draft.movements.findIndex((m) => m.superset === lm.superset);
             return first === mi;
           }).map(({ lm, mi, complete }) => {
-            const mv = byId.get(lm.movementId);
-            const prev = previousFor(data.sessions, lm.movementId);
-            const flagged = !!mv?.flags.length;
-            const active = !complete && lm.sets.some((s) => s.done || s.reps != null || s.weight != null);
-            const sug = mv ? suggestNext(mv, prev?.sets, { bar: data.settings.barKg, plates: data.settings.plates, extraReps: pen.elbowReps }) : { weight: null, reps: null, reason: 'none' as const };
-            const sugP = penalisedHint(mv, { weight: sug.weight, reps: sug.reps }, penalty.multiplier, pen);
-            const ssIndex = lm.superset ? draft.movements.filter((m) => m.superset === lm.superset).findIndex((m) => m === lm) : -1;
-            const isPr = beats(bestWorking(lm.sets), prev ? bestWorking(prev.sets) : null);
+            const groupIdx = memberIndexes(draft.movements, mi);
+            const isGroup = !!(lm.superset && groupIdx.length > 1);
+            const facts = groupIdx.map((i) => movementFacts(draft.movements[i]));
+            const { mv, prev } = facts[0];
+            const isPr = facts.some((f) => f.isPr);
+            const flagged = facts.some((f) => f.flagged);
+            const active = !complete && groupIdx.some((i) => draft.movements[i].sets.some((s) => s.done || s.reps != null || s.weight != null));
+            const outsideBefore = groupIdx[0] > 0;
+            const outsideAfter = draft.movements.some((m, i) => i > groupIdx[0] && !(lm.superset && m.superset === lm.superset));
+            const names = groupIdx.map((i) => draft.movements[i].name).join(' + ');
             return (
-              <article key={mi} className={`card mv ${complete ? 'complete' : active ? 'active' : ''} ${isPr ? 'pr' : ''} ${flagged ? 'flagged' : ''} ${lm.superset ? 'superset' : ''}`}>
-                {lm.superset && (
-                  <span className="ss-tag">
-                    {draft.movements.filter((m) => m.superset === lm.superset).map((m) => m.name).join(' → ')}
-                  </span>
-                )}
+              <article key={isGroup ? `ss-${lm.superset}` : mi} className={`card mv ${complete ? 'complete' : active ? 'active' : ''} ${isPr ? 'pr' : ''} ${flagged ? 'flagged' : ''} ${isGroup ? 'superset' : ''}`}>
+                {isGroup && <span className="ss-tag">Superset</span>}
                 <div className="mv-head" onClick={() => complete && setCollapsed((c) => ({ ...c, [mi]: !c[mi] }))} style={complete ? { cursor: 'pointer' } : undefined}>
                   <div>
-                    <h3><span>{lm.name}{complete ? (collapsed[mi] === false ? ' ▾' : ' ▸') : ''}</span>{isPr && <span className="pr-pill">PR</span>}</h3>
-                    <small>{mv ? displayTarget(mv, data.settings.goal, data.settings.prescriptions?.[mv.id]) : ''}{prev?.notes ? ` · Last: ${prev.notes}` : ''}</small>
+                    <h3>
+                      <span>{isGroup ? names : lm.name}{complete ? (collapsed[mi] === false ? ' ▾' : ' ▸') : ''}</span>
+                      {!isGroup && facts[0].isPr && <span className="pr-pill">PR</span>}
+                    </h3>
+                    <small>
+                      {isGroup
+                        ? 'Alternate A1 then B1, then rest. Each movement logs on its own.'
+                        : <>{mv ? displayTarget(mv, data.settings.goal, data.settings.prescriptions?.[mv.id]) : ''}{prev?.notes ? ` · Last: ${prev.notes}` : ''}</>}
+                    </small>
                   </div>
                 </div>
                 <div className="mv-actions" onClick={(e) => e.stopPropagation()}>
                   <span className="mv-actions-group">
-                    <button className="icon" disabled={mi === 0} onClick={() => moveCard(mi, -1)} aria-label="Move up">↑</button>
-                    <button className="icon" disabled={mi === draft.movements.length - 1} onClick={() => moveCard(mi, 1)} aria-label="Move down">↓</button>
+                    <button className="icon" disabled={!outsideBefore} onClick={() => saveDraft(moveBlock(draft.movements, mi, -1))} aria-label="Move up">↑</button>
+                    <button className="icon" disabled={!outsideAfter} onClick={() => saveDraft(moveBlock(draft.movements, mi, 1))} aria-label="Move down">↓</button>
                   </span>
-                  <span className="mv-actions-group">
-                    <button className={`chip ${lm.gvt ? 'on' : ''}`} onClick={() => saveDraft(draft.movements.map((m, i) => i === mi ? { ...m, gvt: !m.gvt } : m))}>GVT</button>
-                    <button className="chip" onClick={() => setPicker({ mode: 'swap', index: mi })}>Swap</button>
-                  </span>
+                  {!isGroup && (
+                    <span className="mv-actions-group">
+                      <button className={`chip ${lm.gvt ? 'on' : ''}`} onClick={() => saveDraft(draft.movements.map((m, i) => i === mi ? { ...m, gvt: !m.gvt } : m))}>GVT</button>
+                      <button className="chip" onClick={() => setPicker({ mode: 'swap', index: mi })}>Swap</button>
+                    </span>
+                  )}
                 </div>
                 {complete && collapsed[mi] !== false ? null : (
                 <>
-                {mv && editing === mv.id && (
-                  <div className="row" style={{ margin: '8px 0', gap: 6 }}>
-                    <input style={{ width: 60 }} inputMode="numeric" placeholder="sets" defaultValue={data.settings.prescriptions?.[mv.id]?.sets ?? mv.sets}
-                      onBlur={(e) => savePrescription(mv.id, { sets: e.target.value ? Number(e.target.value) : undefined })} />
-                    <input style={{ width: 70 }} inputMode="numeric" placeholder="min" defaultValue={data.settings.prescriptions?.[mv.id]?.repMin ?? mv.repMin ?? ''}
-                      onBlur={(e) => savePrescription(mv.id, { repMin: e.target.value ? Number(e.target.value) : null })} />
-                    <input style={{ width: 70 }} inputMode="numeric" placeholder="max" defaultValue={data.settings.prescriptions?.[mv.id]?.repMax ?? mv.repMax ?? ''}
-                      onBlur={(e) => savePrescription(mv.id, { repMax: e.target.value ? Number(e.target.value) : null })} />
-                    <input style={{ flex: 1 }} placeholder="notes" defaultValue={data.settings.prescriptions?.[mv.id]?.notes ?? mv.notes ?? ''}
-                      onBlur={(e) => savePrescription(mv.id, { notes: e.target.value || undefined })} />
-                    <button className="ghost" onClick={() => { savePrescription(mv.id, {}); setEditing(null); }}>Done</button>
+                {isGroup ? (
+                  <div className="ss-members">
+                    {groupIdx.map((i, idx) => {
+                      const m = draft.movements[i];
+                      const f = facts[idx];
+                      return (
+                        <div className="ss-member" key={i}>
+                          <div className="ss-member-head">
+                            <div>
+                              <h3>
+                                <span className="ss-letter">{supersetLetter(idx)}</span>
+                                <span>{m.name}</span>
+                                {f.isPr && <span className="pr-pill">PR</span>}
+                              </h3>
+                              <small>{f.mv ? displayTarget(f.mv, data.settings.goal, data.settings.prescriptions?.[f.mv.id]) : ''}{f.prev?.notes ? ` · Last: ${f.prev.notes}` : ''}</small>
+                            </div>
+                            <span className="ss-actions">
+                              <button className={`chip ${m.gvt ? 'on' : ''}`} onClick={() => saveDraft(draft.movements.map((x, n) => n === i ? { ...x, gvt: !x.gvt } : x))}>GVT</button>
+                              <button className="chip" onClick={() => setPicker({ mode: 'swap', index: i })}>Swap</button>
+                              <button className="chip" onClick={() => unlinkAt(i)}>Unlink</button>
+                              <button className="chip" onClick={() => saveDraft(removeMovement(draft.movements, i))}>Remove</button>
+                            </span>
+                          </div>
+                          {renderWork(m, i, (si) => setMark(idx, si))}
+                          <span className="muted">{lastLabel(f.prev)}</span>
+                          <input className="notes" placeholder="Notes" value={m.notes ?? ''} onChange={(e) => setMovementNotes(i, e.target.value)} style={{ marginTop: 8, width: '100%' }} />
+                        </div>
+                      );
+                    })}
                   </div>
-                )}
-                {sug.reason !== 'none' && (
-                  <p className="suggest">
-                    <b>Next: {sugP.weight != null ? `${sugP.weight} kg \u00d7 ` : ''}{sugP.reps}</b>
-                    <span>{sug.reason === 'add-weight' ? 'Top of range hit. Add weight' : sug.reason === 'add-reps' ? 'Add a rep' : 'Repeat'}{sugP.addedKg || sugP.addedReps ? ' (incl. penalty)' : ''}</span>
-                    {mv?.equipment === 'barbell' && sugP.weight != null && <span className="plates">{plateLabel(plateLoad(sugP.weight, data.settings.barKg, data.settings.plates))}</span>}
-                  </p>
-                )}
-                {flagged && mv!.flags.map((f) => <p key={f} className="flag">{'\u26a0'} {FLAG_INFO[f]?.reminder ?? f}</p>)}
-                {lm.gvt ? (
-                  <div>
-                    {blocks(lm.sets).length > 0 && (
-                      <p className="muted" style={{ margin: '4px 0 8px' }}>
-                        {blocks(lm.sets).map(blockLabel).join(' · ')}
-                      </p>
-                    )}
-                    <div className="gvt-start" style={{ marginBottom: 8 }}>
-                      <NumInput kind="kg" label={`${lm.name} kg`} value={gvtKg[mi] ?? null}
-                        placeholder={(() => { const p = previousFor(data.sessions, lm.movementId); const w = p ? [...p.sets].reverse().find((x) => x.done && x.weight != null)?.weight : undefined; return w != null ? String(w) : 'kg'; })()}
-                        onChange={(n) => setGvtKg((k) => ({ ...k, [mi]: n }))} />
-                    </div>
-                    <GvtTimer key={`${mi}-${doneSets(lm)}`} {...data.settings.gvt} sound={data.settings.sound} vibrate={data.settings.vibrate}
-                      startAt={doneSets(lm)} weight={gvtKg[mi] ?? null}
-                      onFinish={(reps) => { logGvt(mi, gvtKg[mi] ?? null, reps); setGvtKg((k) => ({ ...k, [mi]: null })); }}
-                      onAdjust={(reps) => { logGvt(mi, gvtKg[mi] ?? null, reps); setGvtKg((k) => ({ ...k, [mi]: null })); }} />
-                  </div>
-                ) : isCardio(lm.name) ? (
-                  <div className="cardio-inputs" style={{ margin: '8px 0' }}>
-                    <div className="row" style={{ gap: 8 }}>
-                      <label className="form" style={{ flex: 1 }}>
-                        Time (min)
-                        <input type="number" inputMode="decimal" value={lm.durationMin ?? ''} placeholder="e.g. 30"
-                          onChange={(e) => setCardio(mi, { durationMin: e.target.value ? Number(e.target.value) : undefined })} />
-                      </label>
-                      <label className="form" style={{ flex: 1 }}>
-                        Distance (km)
-                        <input type="number" inputMode="decimal" step="0.1" value={lm.distanceKm ?? ''} placeholder="e.g. 5"
-                          onChange={(e) => setCardio(mi, { distanceKm: e.target.value ? Number(e.target.value) : undefined })} />
-                      </label>
-                    </div>
-                    <p className="muted" style={{ marginTop: 6 }}>
-                      {paceLabel(lm.durationMin, lm.distanceKm) ?? 'Avg pace —'}
-                      {' · '}
-                      {kcalLabel(lm.name, lm.durationMin, bodyKg) ?? 'Calories —'}
-                      {bodyKg !== 80 ? ` (at ${bodyKg} kg)` : ' (est. at 80 kg)'}
-                      {data.settings.cardioGoal && data.settings.cardioGoal !== 'maintenance' ? ` · Priority: ${data.settings.cardioGoal}` : ''}
-                    </p>
-                  </div>
-                ) : (
-                <div className="sets">
-                  <div className="sets-h"><span>Set</span><span>kg</span><span>Reps</span><span /></div>
-                  {lm.sets.map((s, si) => {
-                    const prevSet = prev?.sets[si];
-                    const base = (s.kind ?? 'working') !== 'working' || sug.reason === 'none' ? prevSet : { weight: sug.weight, reps: sug.reps };
-                    const p = base ? penalisedHint(mv, base, penalty.multiplier, pen) : { weight: null, reps: (s.kind ?? 'working') === 'working' ? mv?.repMin ?? null : null };
-                    const dropHint = s.kind === 'drop' ? suggestDrop(prevSet, s.dropStart ?? s.weight) : null;
-                    return (
-                      <>
-                        <SetRow key={si} index={si} s={s} hint={p}
-                          onEdit={(patch) => updateSet(mi, si, patch)}
-                          onKind={(k) => setKind(mi, si, k)}
-                          onTick={() => updateSet(mi, si, s.done ? { reps: null } : { reps: s.reps ?? p.reps ?? null, weight: s.weight ?? p.weight ?? null })} />
-                        {dropHint?.end != null && s.dropEnd == null && (
-                          <p className="muted small" style={{ margin: '2px 0 6px 44px' }}>Drop to ~{dropHint.end} kg{dropHint.dropKg ? ` (\u2212${dropHint.dropKg} kg)` : ''}</p>
-                        )}
-                      </>
-                    );
-                  })}
-                </div>
-                )}
-                {lm.superset && draft.movements.map((pm, pi) => pi !== mi && pm.superset === lm.superset ? (
-                  <div key={pi} className="sets" style={{ marginTop: 10 }}>
-                    <div className="row" style={{ margin: '4px 0', justifyContent: 'space-between' }}>
-                      <span className="muted">{pm.name}</span>
-                      <button className="chip" onClick={() => unlinkOne(pi)}>Unlink</button>
-                    </div>
-                    <div className="sets-h"><span>Set</span><span>kg</span><span>Reps</span><span /></div>
-                    {pm.sets.map((s, si) => (
-                      <SetRow key={si} index={si} s={s}
-                        hint={{ weight: null, reps: null }}
-                        onEdit={(patch) => updateSet(pi, si, patch)}
-                        onKind={(k) => setKind(pi, si, k)}
-                        onTick={() => updateSet(pi, si, s.done ? { reps: null } : { reps: s.reps ?? null, weight: s.weight ?? null })} />
-                    ))}
-                  </div>
-                ) : null)}
+                ) : renderWork(lm, mi)}
                 <div className="mv-foot">
-                  <span className="muted">{prev ? `Last: ${prev.sets.filter((x) => x.done).map((x) => `${x.weight ?? '–'}×${x.reps ?? '–'}`).join(', ')}` : 'No previous session'}</span>
+                  {!isGroup && <span className="muted">{lastLabel(prev)}</span>}
                   <div className="mv-actions" style={{ margin: '6px 0 0' }}>
                     <span className="mv-actions-group">
-                      <button className="chip" onClick={() => saveDraft(draft.movements.map((m, i) => i === mi ? { ...m, sets: [...m.sets, { reps: null, weight: null, done: false }] } : m))}>+ Set</button>
-                      <button className={`chip ${lm.superset ? 'on' : ''}`} onClick={() => startSuperset(mi)}>Superset</button>
-                      <button className="chip" onClick={() => saveDraft(draft.movements.filter((_, i) => i !== mi))}>Remove</button>
+                      <button className="chip" onClick={() => addRound(mi)}>+ Set</button>
+                      <button className={`chip ${isGroup ? 'on' : ''}`} onClick={() => openSuperset(mi)}>Superset</button>
+                      {isGroup
+                        ? <button className="chip" onClick={() => saveDraft(removeGroup(draft.movements, mi))}>Remove all</button>
+                        : <button className="chip" onClick={() => saveDraft(removeMovement(draft.movements, mi))}>Remove</button>}
                     </span>
                     {complete
                       ? <button className="chip" onClick={() => reopenMovement(mi)}>Reopen</button>
                       : <button className="primary" onClick={() => finishMovement(mi)}>Finish</button>}
                   </div>
-                  <input className="notes" placeholder="Notes" value={lm.notes ?? ''} onChange={(e) => setMovementNotes(mi, e.target.value)} style={{ marginTop: 8, width: '100%' }} />
+                  {!isGroup && <input className="notes" placeholder="Notes" value={lm.notes ?? ''} onChange={(e) => setMovementNotes(mi, e.target.value)} style={{ marginTop: 8, width: '100%' }} />}
                 </div>
                 </>
                 )}
@@ -566,35 +604,18 @@ export default function Today({ data, setData, prefs }: Props) {
       )}
     
       
-      {ssPick && (
-        <div className="sheet" onClick={() => setSsPick(null)}>
-          <div className="sheet-body" onClick={(e) => e.stopPropagation()}>
-            <h3>Superset</h3>
-            <p className="muted">Add movements. They run back-to-back, then you rest. Unlink one if you pick wrong.</p>
-            {draft.movements[ssPick.index].superset && (
-              <div className="chips" style={{ marginBottom: 8 }}>
-                {draft.movements.map((m, i) => m.superset === draft.movements[ssPick.index].superset && i !== ssPick.index ? (
-                  <button key={i} className="chip on" onClick={() => unlinkOne(i)}>{m.name} · unlink</button>
-                ) : null)}
-              </div>
-            )}
-            <button className="primary wide" onClick={() => setPicker({ mode: 'superset', index: ssPick.index })}>Add a movement</button>
-            {draft.movements.some((m, i) => i !== ssPick.index && m.superset !== draft.movements[ssPick.index].superset) && (
-              <>
-                <p className="muted" style={{ marginTop: 10 }}>Or link one already in the session:</p>
-                <div className="chips">
-                  {draft.movements.map((m, i) => i === ssPick.index || m.superset === draft.movements[ssPick.index].superset ? null : (
-                    <button key={i} className="chip" onClick={() => addToSuperset(ssPick.index, [i])}>{m.name}</button>
-                  ))}
-                </div>
-              </>
-            )}
-            <div className="row" style={{ marginTop: 12 }}>
-              {draft.movements[ssPick.index].superset && <button className="ghost" onClick={() => { unlinkAll(ssPick.index); setSsPick(null); }}>Unlink all</button>}
-              <button className="primary" onClick={() => setSsPick(null)}>Done</button>
-            </div>
-          </div>
-        </div>
+      {ssPick && draft.movements[ssPick.index] && (
+        <SupersetPicker
+          anchorIndex={ssPick.index}
+          movements={draft.movements}
+          library={data.movements}
+          focus={plan.focus}
+          onJoinExisting={joinExisting}
+          onJoinLibrary={joinLibrary}
+          onUnlink={unlinkAt}
+          onUnlinkAll={() => unlinkGroup(ssPick.index)}
+          onClose={() => setSsPick(null)}
+        />
       )}
 
       {checkin && (
@@ -622,6 +643,73 @@ export default function Today({ data, setData, prefs }: Props) {
       )}
 
     </section>
+  );
+}
+
+function SupersetPicker({ anchorIndex, movements, library, focus, onJoinExisting, onJoinLibrary, onUnlink, onUnlinkAll, onClose }: {
+  anchorIndex: number;
+  movements: LoggedMovement[];
+  library: Movement[];
+  focus: string;
+  onJoinExisting: (index: number) => void;
+  onJoinLibrary: (m: Movement) => void;
+  onUnlink: (index: number) => void;
+  onUnlinkAll: () => void;
+  onClose: () => void;
+}) {
+  const anchor = movements[anchorIndex];
+  const grouped = anchor.superset
+    ? movements.flatMap((m, i) => (m.superset === anchor.superset ? [{ m, i }] : []))
+    : [];
+  const others = movements.flatMap((m, i) => {
+    if (i === anchorIndex) return [];
+    if (anchor.superset && m.superset === anchor.superset) return [];
+    return [{ m, i }];
+  });
+  return (
+    <div className="sheet" onClick={onClose}>
+      <div className="sheet-body" onClick={(e) => e.stopPropagation()}>
+        <h3>Superset</h3>
+        <p className="muted">Pair {anchor.name} with another movement. Sets alternate A1, B1, and each one logs on its own.</p>
+        {grouped.length > 1 && (
+          <>
+            <h4>In this superset</h4>
+            <ul className="pick">
+              {grouped.map(({ m, i }) => (
+                <li key={i}>
+                  <div className="row" style={{ justifyContent: 'space-between', margin: 0 }}>
+                    <span>{i === anchorIndex ? `${m.name} · this one` : m.name}</span>
+                    <button className="chip" onClick={() => onUnlink(i)}>Unlink</button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
+        <h4>In this workout</h4>
+        {others.length ? (
+          <ul className="pick">
+            {others.map(({ m, i }) => {
+              const logged = m.sets.filter((s) => s.done).length;
+              return (
+                <li key={i}>
+                  <button onClick={() => onJoinExisting(i)}>
+                    {m.name}
+                    <small>{logged ? `${logged} set${logged === 1 ? '' : 's'} logged · moves onto this card` : 'Already in today · add to this card'}</small>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        ) : <p className="muted">No other movements in today&apos;s workout.</p>}
+        <h4>Add from library</h4>
+        <Picker movements={library} focus={focus} onPick={onJoinLibrary} />
+        <div className="row" style={{ marginTop: 12 }}>
+          {grouped.length > 1 && <button className="ghost" onClick={onUnlinkAll}>Unlink all</button>}
+          <button className="primary" onClick={onClose}>Done</button>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -656,6 +744,13 @@ function Picker({ movements, focus, onPick }: { movements: Movement[]; focus: st
       </ul>
     </>
   );
+}
+
+function lastLabel(prev: LoggedMovement | undefined) {
+  if (!prev) return 'No previous session';
+  const done = prev.sets.filter((x) => x.done);
+  if (!done.length) return 'No previous session';
+  return `Last: ${done.map((x) => `${x.weight ?? '–'}×${x.reps ?? '–'}`).join(', ')}`;
 }
 
 function short(name: string) {

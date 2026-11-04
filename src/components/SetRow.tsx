@@ -10,19 +10,22 @@ const KIND_NAME: Record<SetKind, string> = { working: 'Working', warmup: 'Warm-u
  * the hinted numbers, swipe left on a done set to clear it. The tick button does the same.
  * Drop sets show start and end weight fields.
  */
-export default function SetRow({ index, s, hint, onEdit, onTick, onKind }: {
+export default function SetRow({ index, s, hint, onEdit, onTick, onKind, label }: {
   index: number;
   s: SetEntry;
   hint: { weight: number | null; reps: number | null };
   onEdit: (patch: { reps?: number | null; weight?: number | null; dropStart?: number | null; dropEnd?: number | null }) => void;
   onTick: () => void;
   onKind: (k: SetKind) => void;
+  /** Superset mark such as A1 or B2. Falls back to the set number. */
+  label?: string;
 }) {
   const start = useRef<{ x: number; y: number } | null>(null);
   const [dx, setDx] = useState(0);
   const kind = s.kind ?? 'working';
   const nextKind = SET_KINDS[(SET_KINDS.indexOf(kind) + 1) % SET_KINDS.length];
   const isDrop = kind === 'drop';
+  const mark = label || String(index + 1);
 
   return (
     <div className="swipe-wrap">
@@ -44,21 +47,21 @@ export default function SetRow({ index, s, hint, onEdit, onTick, onKind }: {
         }}
         onPointerCancel={() => { start.current = null; setDx(0); }}
       >
-        <button className={`setno ${kind}`} aria-label={`Set ${index + 1}, ${KIND_NAME[kind]}. Tap for ${KIND_NAME[nextKind]}`} onClick={() => onKind(nextKind)}>
-          {KIND_LABEL[kind] || index + 1}
+        <button className={`setno ${kind}${label ? ' mark' : ''}`} aria-label={`Set ${mark}, ${KIND_NAME[kind]}. Tap for ${KIND_NAME[nextKind]}`} onClick={() => onKind(nextKind)}>
+          {KIND_LABEL[kind] || mark}
         </button>
         {isDrop ? (
           <>
-            <NumInput kind="kg" label={`Set ${index + 1} start kg`} placeholder="start" value={s.dropStart ?? null}
+            <NumInput kind="kg" label={`Set ${mark} start kg`} placeholder="start" value={s.dropStart ?? null}
               onChange={(n) => onEdit({ dropStart: n, weight: n })} />
-            <NumInput kind="kg" label={`Set ${index + 1} end kg`} placeholder="end" value={s.dropEnd ?? null}
+            <NumInput kind="kg" label={`Set ${mark} end kg`} placeholder="end" value={s.dropEnd ?? null}
               onChange={(n) => onEdit({ dropEnd: n })} />
           </>
         ) : (
-          <NumInput kind="kg" label={`Set ${index + 1} kg`} placeholder={hint.weight != null ? String(hint.weight) : 'kg'} value={s.weight}
+          <NumInput kind="kg" label={`Set ${mark} kg`} placeholder={hint.weight != null ? String(hint.weight) : 'kg'} value={s.weight}
             onChange={(n) => onEdit({ weight: n })} />
         )}
-        <NumInput kind="reps" label={`Set ${index + 1} reps`} placeholder={hint.reps != null ? String(hint.reps) : 'reps'} value={s.reps}
+        <NumInput kind="reps" label={`Set ${mark} reps`} placeholder={hint.reps != null ? String(hint.reps) : 'reps'} value={s.reps}
           onChange={(n) => onEdit({ reps: n })} />
         <button aria-label={s.done ? 'Done. Tap to clear' : 'Complete with suggested numbers'} className={`tick ${s.done ? 'on' : ''}`} onClick={onTick}>✓</button>
       </div>
