@@ -248,6 +248,20 @@ small, .muted { color: var(--muted); }
 .mv-actions .icon:disabled { opacity: .35; }
 .flag { color: var(--gvt-ink); font-size: var(--fs-sm); margin: 6px 0; background: var(--gvt-bg); border-radius: var(--r-sm); padding: 8px 10px; }
 .ss-tag { display: inline-block; font-size: var(--fs-2xs); font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: #3b82c4; margin-bottom: 4px; }
+.ss-members > .ss-member { margin-top: 14px; padding-top: 12px; border-top: 1px dashed color-mix(in srgb, #3b82c4 38%, var(--border)); }
+.ss-members > .ss-member:first-child { margin-top: 8px; padding-top: 0; border-top: none; }
+.ss-member-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; flex-wrap: wrap; }
+.ss-member-head h3 { margin: 0 0 2px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.ss-letter {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 22px; height: 22px; border-radius: 7px; flex: none;
+  background: #e7f1fb; color: #3b82c4; font-size: 12px; font-weight: 800;
+}
+.ss-actions { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+.ss-actions .chip { min-height: 36px; padding: 0 10px; font-size: var(--fs-xs); }
+.setno.mark { font-size: 14px; letter-spacing: -.03em; padding: 0; }
+.card.superset .sets-h,
+.card.superset .set { grid-template-columns: 64px 1fr 1fr 56px; }
 
 .sets { margin-top: 10px; display: grid; gap: 8px; }
 .sets-h, .set { display: grid; grid-template-columns: 52px 1fr 1fr 60px; gap: 8px; align-items: center; }
