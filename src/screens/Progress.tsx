@@ -1,10 +1,11 @@
 import { useMemo, useState } from 'react';
 import { AppData, uid } from '../lib/store';
-import { eveningWeights, liftSeries, movingAvg, muscleFatigue, trackedLifts, weeklyMuscleSets } from '../engine/analytics';
+import { eveningWeights, liftSeries, movingAvg, muscleFatigue, supersetUsage, trackedLifts, weeklyMuscleSets } from '../engine/analytics';
 import { MUSCLES } from '../data/muscles';
 import LineChart from '../components/LineChart';
 import BodyMap from '../components/BodyMap';
 import { parseKg } from '../lib/kg';
+import { weekStart } from '../engine/week';
 import { BodyEntry } from '../types';
 
 type Props = { data: AppData; setData: React.Dispatch<React.SetStateAction<AppData>> };
@@ -19,6 +20,11 @@ export default function Progress({ data, setData }: Props) {
   const series = useMemo(() => liftSeries(data.sessions, id), [data.sessions, id]);
   const weekly = useMemo(() => weeklyMuscleSets(data.sessions, data.movements), [data.sessions, data.movements]);
   const fatigue = useMemo(() => muscleFatigue(data.sessions, data.movements), [data.sessions, data.movements]);
+  const supersets = useMemo(() => {
+    const start = weekStart();
+    const end = new Date(start.getTime() + 7 * 864e5 + 3600e3);
+    return supersetUsage(data.sessions, start, end);
+  }, [data.sessions]);
   const target = data.settings.muscleTarget;
   const best = series.length ? Math.max(...series.map((p) => p.e1rm)) : null;
 
@@ -46,6 +52,21 @@ export default function Progress({ data, setData }: Props) {
         <h3>Muscle load</h3>
         <p className="muted">Darker = worked harder recently. Fades as it recovers (about 36 h half-life, a rough guide).</p>
         <BodyMap load={fatigue} />
+      </div>
+
+      <div className="card ss-usage" aria-label="Superset usage this week">
+        <h3>Supersets</h3>
+        <p className="muted small">This week. Hard sets in a group shared by two or more movements.</p>
+        <div className="ss-stats">
+          <p>
+            <b>{supersets.supersets}</b>
+            <span>{supersets.supersets === 1 ? 'Superset' : 'Supersets'}</span>
+          </p>
+          <p>
+            <b>{supersets.sets}</b>
+            <span>{supersets.sets === 1 ? 'Superset set' : 'Superset sets'}</span>
+          </p>
+        </div>
       </div>
 
       <div className="card">

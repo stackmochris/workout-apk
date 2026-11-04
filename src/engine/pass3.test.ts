@@ -4,7 +4,7 @@ import { suggestNext } from './progression';
 import { e1rm } from './history';
 import { bodyCsv, csvCell, sessionsCsv } from './csv';
 import { DEFAULT_SETTINGS, migrate } from './migrate';
-import { eveningWeights, liftSeries, movingAvg, muscleFatigue, recoveryHint, weeklyMuscleSets } from './analytics';
+import { SUPERSET_FATIGUE_MULT, eveningWeights, liftSeries, movingAvg, muscleFatigue, recoveryHint, supersetUsage, weeklyMuscleSets } from './analytics';
 import { musclesFor } from '../data/muscles';
 import { SEED_MOVEMENTS } from '../data/movements';
 import { parseBackup, pruneKeys } from '../lib/backup';
@@ -167,5 +167,66 @@ describe('analytics', () => {
     const w = eveningWeights([e(20, 7, 88), e(20, 22, 90), e(21, 1, 89.5), e(21, 23, 89)]);
     expect(w.map((x) => [x.day, x.weight])).toEqual([['2026-10-20', 89.5], ['2026-10-21', 89]]);
     expect(movingAvg([90, 88, 86], 2)).toEqual([90, 89, 87]);
+  });
+
+  it('adds 12% fatigue for hard sets in a real superset only', () => {
+    expect(SUPERSET_FATIGUE_MULT).toBe(1.12);
+    const when = new Date(2026, 9, 22, 9);
+    const iso = when.toISOString();
+    const bench = [set(40, 5, 'warmup'), set(80, 8), set(80, 6)];
+    const fly = [set(15, 12)];
+    const pull = [set(60, 10), set(50, 8, 'drop')];
+    const plain = sess(iso, 'Chest', [
+      { movementId: 'bench-x', name: 'Bench press', sets: bench },
+      { movementId: 'fly-x', name: 'Cable fly', sets: fly },
+      { movementId: 'pull-x', name: 'Lat pulldown', sets: pull },
+    ]);
+    const linked = sess(iso, 'Chest', [
+      { movementId: 'bench-x', name: 'Bench press', sets: bench, superset: 'g1' },
+      { movementId: 'fly-x', name: 'Cable fly', sets: fly, superset: 'g1' },
+      { movementId: 'pull-x', name: 'Lat pulldown', sets: pull },
+    ]);
+    const lone = sess(iso, 'Chest', [
+      { movementId: 'bench-x', name: 'Bench press', sets: bench, superset: 'only' },
+      { movementId: 'fly-x', name: 'Cable fly', sets: fly, superset: 'other' },
+      { movementId: 'pull-x', name: 'Lat pulldown', sets: pull, superset: 'pull' },
+    ]);
+    const straight = muscleFatigue([plain], [], when);
+    const paired = muscleFatigue([linked], [], when);
+    expect(paired.chest! / straight.chest!).toBeCloseTo(SUPERSET_FATIGUE_MULT, 5);
+    expect(paired.triceps! / straight.triceps!).toBeCloseTo(SUPERSET_FATIGUE_MULT, 5);
+    expect(paired.lats).toBe(straight.lats);
+    expect(muscleFatigue([lone], [], when)).toEqual(straight);
+    expect(weeklyMuscleSets([linked], [], when)).toEqual(weeklyMuscleSets([plain], [], when));
+    expect(liftSeries([linked], 'bench-x')).toEqual(liftSeries([plain], 'bench-x'));
+  });
+
+  it('counts supersets and their hard sets inside the period', () => {
+    const start = new Date(2026, 9, 19);
+    const end = new Date(start.getTime() + 7 * 864e5 + 3600e3);
+    const undone = { weight: 80, reps: 8, done: false };
+    const week = sess(new Date(2026, 9, 20, 9).toISOString(), 'Chest', [
+      { movementId: 'bench-x', name: 'Bench press', sets: [set(40, 5, 'warmup'), set(80, 8), set(60, 8, 'drop'), set(80, 6, 'failure'), undone], superset: 'g1' },
+      { movementId: 'fly-x', name: 'Cable fly', sets: [set(15, 12)], superset: 'g1' },
+      { movementId: 'pull-x', name: 'Lat pulldown', sets: [set(60, 10), set(60, 10)] },
+      { movementId: 'curl-x', name: 'Curl', sets: [set(12, 10)], superset: 'lonely' },
+    ]);
+    const arms = sess(new Date(2026, 9, 21, 18).toISOString(), 'Arm', [
+      { movementId: 'push-x', name: 'Pushdown', sets: [set(20, 12)], superset: 'g2' },
+      { movementId: 'curl-x', name: 'Curl', sets: [set(12, 10)], superset: 'g2' },
+      { movementId: 'push-y', name: 'Pushdown', sets: [set(20, 12)], superset: 'g3' },
+      { movementId: 'curl-y', name: 'Curl', sets: [set(12, 10)], superset: 'g3' },
+    ]);
+    const earlier = sess(new Date(2026, 9, 12, 9).toISOString(), 'Chest', [
+      { movementId: 'bench-x', name: 'Bench press', sets: [set(80, 8)], superset: 'old' },
+      { movementId: 'fly-x', name: 'Cable fly', sets: [set(15, 12)], superset: 'old' },
+    ]);
+    const skipped = sess(new Date(2026, 9, 22, 9).toISOString(), 'Chest', [
+      { movementId: 'bench-x', name: 'Bench press', sets: [set(80, 8)], superset: 'sk' },
+      { movementId: 'fly-x', name: 'Cable fly', sets: [set(15, 12)], superset: 'sk' },
+    ], { status: 'skipped' });
+    expect(supersetUsage([week, arms, earlier, skipped], start, end)).toEqual({ supersets: 3, sets: 8 });
+    expect(supersetUsage([week, arms, earlier, skipped])).toEqual({ supersets: 4, sets: 10 });
+    expect(supersetUsage([])).toEqual({ supersets: 0, sets: 0 });
   });
 });

@@ -572,6 +572,25 @@ small, .muted { color: var(--muted); }
 .body { width: 120px; height: 240px; }
 .body .outline { fill: var(--surface2); stroke: var(--border); stroke-width: 1; }
 .body path:not(.outline) { transition: fill .4s var(--ease); }
+.card.ss-usage { border-left: 3px solid #3b82c4; }
+.ss-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
+.ss-stats p {
+  margin: 0;
+  padding: 10px 12px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+}
+.ss-stats b {
+  display: block;
+  font-size: var(--fs-xl);
+  font-weight: 650;
+  letter-spacing: -.03em;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+.ss-stats span { display: block; margin-top: 2px; color: var(--muted); font-size: var(--fs-xs); }
 .bars { display: grid; gap: 8px; margin-top: 8px; }
 .bar { display: grid; grid-template-columns: 92px 1fr 36px; gap: 8px; align-items: center; font-size: var(--fs-sm); }
 .bar b { text-align: right; }

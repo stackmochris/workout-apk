@@ -1,9 +1,53 @@
 import { FOCUS_MUSCLES, Muscle, musclesFor } from '../data/muscles';
-import { BodyEntry, Movement, Session } from '../types';
+import { BodyEntry, LoggedMovement, Movement, Session } from '../types';
 import { e1rm } from './history';
 import { weekStart } from './week';
 
 export interface LiftPoint { date: string; e1rm: number; top: number; volume: number }
+
+/** Extra fatigue load for a hard set inside a real superset (2+ movements sharing an id). */
+export const SUPERSET_FATIGUE_MULT = 1.12;
+
+export interface SupersetUsage {
+  /** Groups whose id is shared by 2+ movements in a completed session. */
+  supersets: number;
+  /** Hard sets (done, not warm-up) on movements in those groups. */
+  sets: number;
+}
+
+/** Ids shared by at least two movements in this session. A lone id is not a superset. */
+function supersetIds(movements: Pick<LoggedMovement, 'superset'>[]): Set<string> {
+  const counts = new Map<string, number>();
+  for (const mv of movements) if (mv.superset) counts.set(mv.superset, (counts.get(mv.superset) ?? 0) + 1);
+  const ids = new Set<string>();
+  for (const [id, n] of counts) if (n >= 2) ids.add(id);
+  return ids;
+}
+
+const hardSet = (x: { done: boolean; kind?: string }) => x.done && x.kind !== 'warmup';
+
+/**
+ * Superset groups and their hard sets among completed sessions.
+ * Pass [start, end) to match a period (Progress uses the same week as "Sets this week").
+ */
+export function supersetUsage(sessions: Session[], start?: Date, end?: Date): SupersetUsage {
+  const a = start?.getTime();
+  const b = end?.getTime();
+  let supersets = 0;
+  let sets = 0;
+  for (const s of sessions) {
+    if (s.status !== 'completed') continue;
+    const t = new Date(s.date).getTime();
+    if ((a != null && t < a) || (b != null && t >= b)) continue;
+    const groups = supersetIds(s.movements);
+    supersets += groups.size;
+    for (const mv of s.movements) {
+      if (!mv.superset || !groups.has(mv.superset)) continue;
+      sets += mv.sets.filter(hardSet).length;
+    }
+  }
+  return { supersets, sets };
+}
 
 const counted = (s: Session) => s.status === 'completed' && !s.swap;
 
@@ -65,7 +109,8 @@ export function weeklyMuscleSets(sessions: Session[], movements: Movement[], now
 
 /**
  * Residual fatigue per muscle, 0–1. Each hard set adds load that halves every `halfLifeH` hours.
- * 10 fresh sets ≈ fully fatigued. A rough model, used for the body map tint and hints only.
+ * A hard set in a superset (id shared by 2+ movements in that session) counts as SUPERSET_FATIGUE_MULT.
+ * 10 fresh straight sets ≈ fully fatigued. A rough model, used for the body map tint and hints only.
  */
 export function muscleFatigue(sessions: Session[], movements: Movement[], now = new Date(), halfLifeH = 36): Partial<Record<Muscle, number>> {
   const look = nameLookup(movements);
@@ -75,12 +120,14 @@ export function muscleFatigue(sessions: Session[], movements: Movement[], now = 
     const h = (now.getTime() - new Date(s.date).getTime()) / 3600e3;
     if (h < 0 || h > 24 * 7) continue;
     const decay = Math.pow(0.5, h / halfLifeH);
+    const groups = supersetIds(s.movements);
     for (const mv of s.movements) {
-      const n = mv.sets.filter((x) => x.done && x.kind !== 'warmup').length;
+      const n = mv.sets.filter(hardSet).length;
       if (!n) continue;
+      const load = n * (mv.superset && groups.has(mv.superset) ? SUPERSET_FATIGUE_MULT : 1);
       const { primary, secondary } = musclesFor(look(mv.movementId, mv.name, s.focus));
-      for (const m of primary) raw[m] = (raw[m] ?? 0) + n * decay;
-      for (const m of secondary) raw[m] = (raw[m] ?? 0) + (n / 2) * decay;
+      for (const m of primary) raw[m] = (raw[m] ?? 0) + load * decay;
+      for (const m of secondary) raw[m] = (raw[m] ?? 0) + (load / 2) * decay;
     }
   }
   const out: Partial<Record<Muscle, number>> = {};
