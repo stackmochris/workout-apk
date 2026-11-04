@@ -621,12 +621,12 @@ label.file input { position: absolute; inset: 0; opacity: 0; width: 100%; max-wi
 .theme-green .hero {
   background:
     radial-gradient(38% 72% at 92% -12%, rgba(255, 255, 255, .34), transparent 56%),
-    radial-gradient(140% 180% at 100% -10%, rgba(94, 234, 212, .94) 0%, rgba(20, 184, 166, .95) 28%, rgba(15, 118, 110, .94) 55%, rgba(15, 61, 46, .92) 85%);
-  border-color: rgba(4, 47, 46, .35);
-  --mint: #ccfbf1;
-  --hero-meta: #d5fff4;
+    radial-gradient(140% 180% at 100% -10%, rgba(134, 196, 112, .94) 0%, rgba(58, 135, 64, .95) 28%, rgba(34, 94, 46, .95) 55%, rgba(20, 54, 30, .93) 85%);
+  border-color: rgba(16, 46, 24, .35);
+  --mint: #e3f5d8;
+  --hero-meta: #e8f7de;
 }
-.theme-green .hero h1, .theme-green .hero .pill.Normal { color: #ccfbf1; }
+.theme-green .hero h1, .theme-green .hero .pill.Normal { color: #e3f5d8; }
 .theme-red .hero {
   background:
     radial-gradient(38% 72% at 92% -12%, rgba(255, 255, 255, .28), transparent 56%),
