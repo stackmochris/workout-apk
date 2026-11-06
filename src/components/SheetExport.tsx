@@ -1,16 +1,15 @@
 import { useEffect, useState } from 'react';
-import { useAuth } from '../lib/auth';
-import { googleSheetsAccessToken } from '../lib/googleAccess';
-import { deleteExportSheetId, readExportSheetId, writeExportSheetId } from '../lib/sheetCloud';
-import { forgetLocalSheetId, readLocalSheetId, resolveSheetId, writeLocalSheetId } from '../lib/sheetId';
-import { AppData } from '../lib/store';
 import {
   isGoogleAccount,
   parseSpreadsheetId,
-  pushWorkoutSheet,
   sheetErrorMessage,
   spreadsheetUrl,
 } from '../engine/sheetExport';
+import { useAuth } from '../lib/auth';
+import { exportWorkoutSheet, sheetExportBlocked } from '../lib/exportWorkoutSheet';
+import { deleteExportSheetId, readExportSheetId, writeExportSheetId } from '../lib/sheetCloud';
+import { forgetLocalSheetId, readLocalSheetId, resolveSheetId, writeLocalSheetId } from '../lib/sheetId';
+import { AppData } from '../lib/store';
 
 type Props = { data: AppData };
 
@@ -77,50 +76,25 @@ export default function SheetExport({ data }: Props) {
 
   const exportSheet = async () => {
     setMsg('');
-    if (typeof navigator !== 'undefined' && navigator.onLine === false) {
-      setMsg('You are offline. The Google Sheet was not updated.');
-      return;
-    }
-    const typed = paste.trim();
-    const pastedId = typed ? parseSpreadsheetId(typed) : null;
-    if (typed && !pastedId) {
-      setMsg('That is not a Google Sheet link or id. The sheet was not updated.');
+    const blocked = sheetExportBlocked(paste);
+    if (blocked) {
+      setMsg(blocked);
       return;
     }
     setBusy(true);
     try {
-      const access = await googleSheetsAccessToken(user);
-      let id = pastedId ?? readLocalSheetId(access.uid);
-      if (!id) {
-        try {
-          id = await resolveSheetId(access.uid, { readRemote: () => readExportSheetId(access.uid) });
-        } catch {
-          setMsg('Could not check your saved sheet. The sheet was not updated.');
-          return;
-        }
-      }
-      if (pastedId) {
-        writeLocalSheetId(access.uid, pastedId);
-        setSpreadsheetId(pastedId);
-      }
-      const result = await pushWorkoutSheet({
-        token: access.token,
-        spreadsheetId: id,
+      const result = await exportWorkoutSheet({
+        user,
         sessions: data.sessions,
         body: data.body,
-        onId: async (createdId) => {
-          writeLocalSheetId(access.uid, createdId);
-          setSpreadsheetId(createdId);
-          try { await writeExportSheetId(access.uid, createdId); } catch { /* device copy still blocks a second spreadsheet */ }
-        },
+        pasted: paste,
+        onSpreadsheetId: setSpreadsheetId,
       });
-      setSpreadsheetId(result.spreadsheetId);
-      setPaste('');
-      const synced = await remember(access.uid, result.spreadsheetId);
-      const lead = result.created
-        ? 'Created Workout Export in your Google Drive and wrote your sessions and body stats.'
-        : 'Updated Workout Export. The same sheet was used.';
-      setMsg(synced ? lead : `${lead} The link is saved on this device and will sync to your account when you are online.`);
+      if (result.ok) {
+        setPaste('');
+        setSpreadsheetId(result.spreadsheetId);
+      }
+      setMsg(result.message);
     } catch (error) {
       setMsg(sheetErrorMessage(error));
     } finally {

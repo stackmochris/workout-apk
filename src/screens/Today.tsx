@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { completeSession, currentPlan, preview, skipSession } from '../engine/rotation';
 import { DEFAULT_DAY, FLAG_INFO, SWAP_DEFAULTS } from '../data/movements';
 import { penalisedHint, penaltyState } from '../engine/week';
@@ -20,7 +20,9 @@ import NumInput from '../components/NumInput';
 import { editSet } from '../engine/sets';
 import { blockLabel, blocks, doneSets, logBlock } from '../engine/gvt';
 import { FOCI, Focus, SessionType } from '../types';
+import FinishExportPrompt from '../components/FinishExportPrompt';
 import FinishSheet from '../components/FinishSheet';
+import { offerSheetExport } from '../lib/finishExport';
 import { computeSessionStats, SessionStats } from '../engine/sessionStats';
 import { displayTarget } from '../engine/prescription';
 import { addLibraryMovement, memberIndexes, mergeMovement, moveBlock, movementsToRecord, removeGroup, removeMovement, setMark, supersetLetter, unlinkAll, unlinkMovement } from '../engine/superset';
@@ -70,6 +72,8 @@ export default function Today({ data, setData, prefs }: Props) {
   const [gvtPicks, setGvtPicks] = useState<string[] | null>(null);
   const [swapping, setSwapping] = useState(false);
   const [finish, setFinish] = useState<{ session: Session; stats: SessionStats } | null>(null);
+  const exportSeen = useRef(new Set<string>());
+  const [sheetPrompt, setSheetPrompt] = useState<string | null>(null);
   const [editing, setEditing] = useState<string | null>(null);
   const [collapsed, setCollapsed] = useState<Record<number, boolean>>({});
   const [checkin, setCheckin] = useState<{ weight: string; energy: number; elbow: 'ok' | 'sore'; fasted: boolean } | null>(null);
@@ -292,6 +296,7 @@ export default function Today({ data, setData, prefs }: Props) {
     if (session.status === 'completed') {
       syncSession(session, syncDisplayName(data.settings.displayName, auth?.currentUser?.displayName, auth?.currentUser?.email));
     }
+    if (offerSheetExport(exportSeen.current, session)) setSheetPrompt(session.id);
   };
 
   const logGvt = (mi: number, weight: number | null, reps: number[]) => {
@@ -651,6 +656,15 @@ export default function Today({ data, setData, prefs }: Props) {
             </div>
           </div>
         </div>
+      )}
+
+      {sheetPrompt && (
+        <FinishExportPrompt
+          key={sheetPrompt}
+          sessions={data.sessions}
+          body={data.body}
+          onDismiss={() => setSheetPrompt(null)}
+        />
       )}
 
     </section>
