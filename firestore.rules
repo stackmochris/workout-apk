@@ -13,6 +13,9 @@ service cloud.firestore {
     match /users/{uid}/body/{entryId} {
       allow read, write: if isOwner(uid);
     }
+    match /users/{uid}/meta/{docId} {
+      allow read, write: if isOwner(uid);
+    }
     match /lastSessions/{uid} {
       allow read: if signedIn();
       allow write: if isOwner(uid);
