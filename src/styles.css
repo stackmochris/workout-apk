@@ -599,6 +599,23 @@ small, .muted { color: var(--muted); }
 .track i.hit { background: var(--accent); }
 .body-form { display: grid; grid-template-columns: 1fr 1fr 1fr auto; gap: 6px; margin: 8px 0; }
 .body-form input { padding: 10px 6px; }
+.fasted-check {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 2px 0 10px;
+  min-height: 44px;
+  font-weight: 650;
+  cursor: pointer;
+}
+.fasted-check input {
+  width: 22px;
+  height: 22px;
+  min-height: 22px;
+  padding: 0;
+  flex: 0 0 auto;
+  accent-color: var(--accent);
+}
 label.file { text-align: center; position: relative; }
 label.file input { position: absolute; inset: 0; opacity: 0; width: 100%; max-width: none; cursor: pointer; min-height: 44px; }
 .form label.file { justify-content: center; }

@@ -140,29 +140,51 @@ export function recoveryHint(focus: string, fatigue: Partial<Record<Muscle, numb
   return (FOCUS_MUSCLES[focus] ?? []).filter((m) => (fatigue[m] ?? 0) >= threshold);
 }
 
+const round2 = (n: number) => Math.round(n * 100) / 100;
+
 /**
- * Late-evening weigh-ins only (22:00–02:59 local), so the trend compares like with like.
- * Entries after midnight count for the previous evening. One value per evening (the last one).
+ * Weekly check-in default. Checked only before noon local time.
+ * The Progress body form is an intentional weigh-in and stays checked on its own.
  */
-export function eveningWeights(entries: BodyEntry[]): { day: string; date: string; weight: number }[] {
-  const byDay = new Map<string, { day: string; date: string; weight: number }>();
-  for (const e of [...entries].sort((a, b) => a.date.localeCompare(b.date))) {
-    if (e.weight == null) continue;
-    const d = new Date(e.date);
-    const h = d.getHours();
-    if (!(h >= 22 || h < 3)) continue;
-    const ev = new Date(d);
-    if (h < 3) ev.setDate(ev.getDate() - 1);
-    const day = `${ev.getFullYear()}-${String(ev.getMonth() + 1).padStart(2, '0')}-${String(ev.getDate()).padStart(2, '0')}`;
-    byDay.set(day, { day, date: e.date, weight: e.weight });
-  }
-  return [...byDay.values()];
+export function checkinFastedDefault(now = new Date()): boolean {
+  return now.getHours() < 12;
 }
 
-/** Trailing moving average. */
-export function movingAvg(values: number[], n = 7): number[] {
-  return values.map((_, i) => {
-    const w = values.slice(Math.max(0, i - n + 1), i + 1);
-    return Math.round((w.reduce((a, b) => a + b, 0) / w.length) * 100) / 100;
-  });
+/**
+ * One point per calendar week for weigh-ins marked fasted.
+ * `date` is Monday 00:00 local (weekStart) of that week. Entries without `fasted: true`,
+ * including older logs that never had the flag, are left out. Body fat and waist are ignored.
+ */
+export function fastedWeeklyWeights(entries: BodyEntry[]): { date: string; weight: number }[] {
+  const groups = new Map<number, number[]>();
+  for (const e of entries) {
+    if (e.weight == null || e.fasted !== true || Number.isNaN(e.weight)) continue;
+    const t = weekStart(new Date(e.date)).getTime();
+    const xs = groups.get(t);
+    if (xs) xs.push(e.weight);
+    else groups.set(t, [e.weight]);
+  }
+  return [...groups.entries()]
+    .sort((a, b) => a[0] - b[0])
+    .map(([t, xs]) => ({ date: new Date(t).toISOString(), weight: round2(xs.reduce((a, b) => a + b, 0) / xs.length) }));
+}
+
+/**
+ * Mean weight in [start, end). Fasted weigh-ins only when the period has any;
+ * otherwise every weight in the period. Missing `fasted` is not treated as fasted.
+ */
+export function periodWeightAvg(entries: BodyEntry[], start: Date, end: Date): number | null {
+  const a = start.getTime();
+  const b = end.getTime();
+  const weights: number[] = [];
+  const fasted: number[] = [];
+  for (const e of entries) {
+    if (e.weight == null || Number.isNaN(e.weight)) continue;
+    const t = new Date(e.date).getTime();
+    if (t < a || t >= b) continue;
+    weights.push(e.weight);
+    if (e.fasted === true) fasted.push(e.weight);
+  }
+  const xs = fasted.length ? fasted : weights;
+  return xs.length ? round2(xs.reduce((s, n) => s + n, 0) / xs.length) : null;
 }

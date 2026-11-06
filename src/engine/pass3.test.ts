@@ -4,7 +4,8 @@ import { suggestNext } from './progression';
 import { e1rm } from './history';
 import { bodyCsv, csvCell, sessionsCsv } from './csv';
 import { DEFAULT_SETTINGS, migrate } from './migrate';
-import { SUPERSET_FATIGUE_MULT, eveningWeights, liftSeries, movingAvg, muscleFatigue, recoveryHint, supersetUsage, weeklyMuscleSets } from './analytics';
+import { SUPERSET_FATIGUE_MULT, checkinFastedDefault, fastedWeeklyWeights, liftSeries, muscleFatigue, periodWeightAvg, recoveryHint, supersetUsage, weeklyMuscleSets } from './analytics';
+import { weekStart } from './week';
 import { musclesFor } from '../data/muscles';
 import { SEED_MOVEMENTS } from '../data/movements';
 import { parseBackup, pruneKeys } from '../lib/backup';
@@ -83,13 +84,34 @@ describe('CSV export', () => {
     const csv = sessionsCsv([sess('2026-10-20T08:00:00.000Z', 'Chest', [{ movementId: 'b', name: 'Bench, flat', sets: [set(40, 5, 'warmup'), set(80, 8)] }])]);
     const lines = csv.trim().split('\n');
     expect(lines).toHaveLength(3);
-    expect(lines[0]).toBe('date,focus,type,status,swap,movement_id,movement,superset,set,kind,weight_kg,reps,done');
-    expect(lines[1]).toBe('2026-10-20T08:00:00.000Z,Chest,Normal,completed,,b,"Bench, flat",,1,warmup,40,5,yes');
+    expect(lines[0]).toBe('date,focus,type,status,swap,movement_id,movement,superset,set,kind,weight_kg,reps,done,duration_min,session_notes,movement_notes,movement_duration_min,distance_km,effort,drop_start_kg,drop_end_kg');
+    expect(lines[1]).toBe('2026-10-20T08:00:00.000Z,Chest,Normal,completed,,b,"Bench, flat",,1,warmup,40,5,yes,,,,,,,,');
     expect(lines[2]).toContain(',2,working,80,8,yes');
   });
-  it('writes body stats sorted by date', () => {
-    const e = (date: string, weight: number): BodyEntry => ({ id: date, date, weight, author: 'app', updatedAt: date });
-    expect(bodyCsv([e('2026-10-02', 90), e('2026-10-01', 91)]).split('\n')[1]).toBe('2026-10-01,91,,');
+  it('adds session and movement columns, including a cardio row with no sets', () => {
+    const csv = sessionsCsv([sess('2026-10-21T18:00:00.000Z', 'HIIT', [
+      { movementId: 'b', name: 'Bench', sets: [{ weight: 80, reps: 6, done: true, kind: 'drop', dropStart: 100, dropEnd: 60 }], notes: 'paused', durationMin: 15 },
+      { movementId: 'run', name: 'Easy run', sets: [], durationMin: 32, distanceKm: 5.2, notes: 'park loop' },
+      { movementId: 'mob', name: 'Mobility', sets: [], notes: 'hips' },
+      { movementId: 'x', name: 'Skipped movement', sets: [] },
+    ], { durationMin: 50, distanceKm: 9, effort: 7, notes: 'evening' })]);
+    const lines = csv.trim().split('\n');
+    expect(lines).toHaveLength(4);
+    expect(lines[1]).toBe('2026-10-21T18:00:00.000Z,HIIT,Normal,completed,,b,Bench,,1,drop,80,6,yes,50,evening,paused,15,9,7,100,60');
+    expect(lines[2]).toBe('2026-10-21T18:00:00.000Z,HIIT,Normal,completed,,run,Easy run,,,,,,,50,evening,park loop,32,5.2,7,,');
+    expect(lines[3]).toBe('2026-10-21T18:00:00.000Z,HIIT,Normal,completed,,mob,Mobility,,,,,,,50,evening,hips,,9,7,,');
+  });
+  it('writes body stats sorted by date, with fasted as yes or empty', () => {
+    const e = (date: string, extra: Partial<BodyEntry> = {}): BodyEntry => ({ id: date, date, author: 'app', updatedAt: date, ...extra });
+    const lines = bodyCsv([
+      e('2026-10-02', { weight: 90, fasted: true, energy: 7, elbow: 'ok' }),
+      e('2026-10-01', { weight: 91, fasted: false, bodyFat: 18, waist: 86 }),
+      e('2026-10-03', { weight: 89 }),
+    ]).trim().split('\n');
+    expect(lines[0]).toBe('date,weight_kg,body_fat_pct,waist_cm,energy,elbow,fasted');
+    expect(lines[1]).toBe('2026-10-01,91,18,86,,,');
+    expect(lines[2]).toBe('2026-10-02,90,,,7,ok,yes');
+    expect(lines[3]).toBe('2026-10-03,89,,,,,');
   });
 });
 
@@ -162,11 +184,47 @@ describe('analytics', () => {
     expect(recoveryHint('Back', f, 0.15)).toContain('lats');
     expect(recoveryHint('Leg', f)).toEqual([]);
   });
-  it('trends only late-evening weigh-ins, one per evening', () => {
-    const e = (d: number, h: number, weight: number): BodyEntry => ({ id: `${d}${h}`, date: new Date(2026, 9, d, h).toISOString(), weight, author: 'app', updatedAt: '' });
-    const w = eveningWeights([e(20, 7, 88), e(20, 22, 90), e(21, 1, 89.5), e(21, 23, 89)]);
-    expect(w.map((x) => [x.day, x.weight])).toEqual([['2026-10-20', 89.5], ['2026-10-21', 89]]);
-    expect(movingAvg([90, 88, 86], 2)).toEqual([90, 89, 87]);
+  it('averages fasted weigh-ins by week and leaves unmarked logs out', () => {
+    const e = (d: number, h: number, extra: Partial<BodyEntry>): BodyEntry => ({ id: `${d}${h}`, date: new Date(2026, 9, d, h, h === 23 ? 59 : 0).toISOString(), author: 'app', updatedAt: '', ...extra });
+    const w = fastedWeeklyWeights([
+      e(6, 7, { weight: 80, fasted: true }),
+      e(7, 8, { weight: 82, fasted: true }),
+      e(8, 22, { weight: 90, fasted: false }),
+      e(9, 9, { weight: 88 }),
+      e(11, 23, { weight: 84, fasted: true }),
+      e(12, 0, { weight: 79, fasted: true }),
+      e(13, 7, { bodyFat: 18, fasted: true }),
+    ]);
+    const weekOf5 = weekStart(new Date(2026, 9, 5)).toISOString();
+    const weekOf12 = weekStart(new Date(2026, 9, 12)).toISOString();
+    expect(w).toEqual([{ date: weekOf5, weight: 82 }, { date: weekOf12, weight: 79 }]);
+    expect(fastedWeeklyWeights([])).toEqual([]);
+  });
+  it('period weight average prefers fasted entries and falls back otherwise', () => {
+    const e = (d: number, h: number, extra: Partial<BodyEntry>): BodyEntry => ({ id: `${d}${h}`, date: new Date(2026, 9, d, h).toISOString(), author: 'app', updatedAt: '', ...extra });
+    const start = new Date(2026, 9, 12);
+    const end = new Date(2026, 9, 19);
+    expect(periodWeightAvg([
+      e(11, 23, { weight: 70, fasted: true }),
+      e(12, 0, { weight: 80, fasted: true }),
+      e(14, 8, { weight: 99 }),
+      e(19, 0, { weight: 60, fasted: true }),
+    ], start, end)).toBe(80);
+    expect(periodWeightAvg([
+      e(12, 8, { weight: 80 }),
+      e(13, 22, { weight: 90, fasted: false }),
+    ], start, end)).toBe(85);
+    expect(periodWeightAvg([
+      e(12, 8, { weight: 80 }),
+      e(13, 7, { weight: 90, fasted: true }),
+    ], start, end)).toBe(90);
+    expect(periodWeightAvg([], start, end)).toBeNull();
+  });
+  it('checks the weekly check-in fasted box only before noon', () => {
+    expect(checkinFastedDefault(new Date(2026, 9, 20, 0, 0))).toBe(true);
+    expect(checkinFastedDefault(new Date(2026, 9, 20, 11, 59))).toBe(true);
+    expect(checkinFastedDefault(new Date(2026, 9, 20, 12, 0))).toBe(false);
+    expect(checkinFastedDefault(new Date(2026, 9, 20, 23, 30))).toBe(false);
   });
 
   it('adds 12% fatigue for hard sets in a real superset only', () => {

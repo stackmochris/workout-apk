@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { AppData, uid } from '../lib/store';
-import { eveningWeights, liftSeries, movingAvg, muscleFatigue, supersetUsage, trackedLifts, weeklyMuscleSets } from '../engine/analytics';
+import { fastedWeeklyWeights, liftSeries, muscleFatigue, supersetUsage, trackedLifts, weeklyMuscleSets } from '../engine/analytics';
 import { MUSCLES } from '../data/muscles';
 import LineChart from '../components/LineChart';
 import BodyMap from '../components/BodyMap';
@@ -95,31 +95,42 @@ function BodyStats({ data, setData }: Props) {
   const [w, setW] = useState('');
   const [bf, setBf] = useState('');
   const [waist, setWaist] = useState('');
-  const evening = useMemo(() => eveningWeights(data.body), [data.body]);
-  const trend = movingAvg(evening.map((e) => e.weight), 7);
+  const [fasted, setFasted] = useState(true);
+  const weeks = useMemo(() => fastedWeeklyWeights(data.body), [data.body]);
   const series = (k: 'bodyFat' | 'waist') => data.body.filter((e) => e[k] != null).sort((a, b) => a.date.localeCompare(b.date)).map((e) => ({ x: new Date(e.date).getTime(), y: e[k]! }));
   const recent = [...data.body].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 5);
   const num = (v: string) => { const n = parseKg(v); return n == null ? undefined : n; };
 
   const add = () => {
-    const entry: BodyEntry = { id: uid(), date: new Date().toISOString(), weight: num(w), bodyFat: num(bf), waist: num(waist), author: 'app', updatedAt: new Date().toISOString() };
+    const entry: BodyEntry = { id: uid(), date: new Date().toISOString(), weight: num(w), bodyFat: num(bf), waist: num(waist), fasted, author: 'app', updatedAt: new Date().toISOString() };
     if (entry.weight == null && entry.bodyFat == null && entry.waist == null) return;
     setData((d) => ({ ...d, body: [...d.body, entry] }));
-    setW(''); setBf(''); setWaist('');
+    setW(''); setBf(''); setWaist(''); setFasted(true);
   };
 
   return (
     <div className="card">
       <h3>Body</h3>
+      <label className="fasted-check">
+        <input type="checkbox" checked={fasted} onChange={(e) => setFasted(e.target.checked)} />
+        Fasted
+      </label>
       <div className="body-form">
         <input inputMode="decimal" placeholder="Weight kg" aria-label="Weight kg" value={w} onChange={(e) => setW(e.target.value)} />
         <input inputMode="decimal" placeholder="Body fat %" aria-label="Body fat %" value={bf} onChange={(e) => setBf(e.target.value)} />
         <input inputMode="decimal" placeholder="Waist cm" aria-label="Waist cm" value={waist} onChange={(e) => setWaist(e.target.value)} />
         <button className="primary" onClick={add}>Log</button>
       </div>
-      <h4>Weight, late-evening weigh-ins</h4>
-      <p className="muted small">Only weigh-ins from 10pm to 3am count, so each point compares like with like. Line = 7-weigh-in average.</p>
-      <LineChart points={evening.map((e) => ({ x: new Date(e.date).getTime(), y: e.weight }))} trend={trend} unit="kg" />
+      <h4>Weight</h4>
+      <p className="muted small">Fasted weekly average. Each point is that week's fasted weigh-ins averaged together, plotted on the Monday the week starts.</p>
+      {weeks.length > 0 ? (
+        <LineChart points={weeks.map((e) => ({ x: new Date(e.date).getTime(), y: e.weight }))} unit="kg" />
+      ) : (
+        <div className="empty">
+          <h3>No fasted weigh-ins yet</h3>
+          <p>This chart uses fasted weekly averages. Older evening-only logs will not appear until you log a fasted weight.</p>
+        </div>
+      )}
       {series('bodyFat').length > 0 && <><h4>Body fat %</h4><LineChart points={series('bodyFat')} unit="%" height={110} /></>}
       {series('waist').length > 0 && <><h4>Waist</h4><LineChart points={series('waist')} unit="cm" height={110} /></>}
       {recent.length > 0 && (
@@ -128,7 +139,7 @@ function BodyStats({ data, setData }: Props) {
           {recent.map((e) => (
             <p key={e.id} className="hist-line">
               <span>{new Date(e.date).toLocaleString(undefined, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
-              <span className="muted">{[e.weight != null && `${e.weight} kg`, e.bodyFat != null && `${e.bodyFat}%`, e.waist != null && `${e.waist} cm`].filter(Boolean).join(' · ')}</span>
+              <span className="muted">{[e.weight != null && `${e.weight} kg`, e.fasted && 'fasted', e.bodyFat != null && `${e.bodyFat}%`, e.waist != null && `${e.waist} cm`].filter(Boolean).join(' · ')}</span>
             </p>
           ))}
         </>
