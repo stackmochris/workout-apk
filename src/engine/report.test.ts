@@ -42,14 +42,29 @@ describe('period report', () => {
     const over = buildReport(Array.from({ length: 4 }, (_, i) => sess(12 + i, bench(Array(5).fill(st(60, 10))))), SEED_MOVEMENTS, [], start, end, { perWeek: 4, muscleTarget: 10 });
     expect(over.muscles.find((m) => m.muscle === 'chest')!.status).toBe('over');
   });
-  it('body change uses late-evening weigh-ins only', () => {
-    expect(r.body).toEqual({ weightAvg: 88.75, prevWeightAvg: 90.5, weightChange: -1.75, bodyFatChange: null, waistChange: -1 });
+  it('weight average falls back to every weigh-in when none are fasted', () => {
+    expect(r.body).toEqual({ weightAvg: 85.83, prevWeightAvg: 90.5, weightChange: -4.67, bodyFatChange: null, waistChange: -1 });
+  });
+  it('weight average prefers fasted weigh-ins in each period on its own', () => {
+    const mixed = [
+      body(6, 22, { weight: 91 }),
+      body(7, 8, { weight: 90, fasted: true }),
+      body(13, 7, { weight: 89, fasted: true, waist: 90 }),
+      body(14, 8, { weight: 80 }),
+      body(15, 23, { weight: 88.5, fasted: false, waist: 89 }),
+    ];
+    const rep = buildReport(sessions, SEED_MOVEMENTS, mixed, start, end, { perWeek: 4, muscleTarget: 10 });
+    expect(rep.body.weightAvg).toBe(89);
+    expect(rep.body.prevWeightAvg).toBe(90);
+    expect(rep.body.weightChange).toBe(-1);
+    expect(rep.body.waistChange).toBe(-1);
+    expect(rep.body.bodyFatChange).toBeNull();
   });
   it('counts set types', () => {
     expect(r.setKinds).toEqual({ warmup: 1, working: 1, drop: 1, failure: 1 });
   });
   it('month spans divide sets by weeks and handle empty history', () => {
     const m = buildReport([], SEED_MOVEMENTS, [], new Date(2026, 8, 28), new Date(2026, 9, 26), { perWeek: 4, muscleTarget: 10 });
-    expect([m.weeks, m.planned, m.missed, m.prevVolumeKg, m.volumeChangePct, m.lifts.length]).toEqual([4, 16, 16, null, null, 0]);
+    expect([m.weeks, m.planned, m.missed, m.prevVolumeKg, m.volumeChangePct, m.lifts.length, m.body.weightAvg]).toEqual([4, 16, 16, null, null, 0, null]);
   });
 });

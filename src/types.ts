@@ -140,6 +140,8 @@ export interface BodyEntry {
   waist?: number;
   energy?: number;
   elbow?: 'ok' | 'sore';
+  /** True only when the weigh-in was marked fasted. Missing means unknown, not fasted. */
+  fasted?: boolean;
   author: 'app' | 'assistant';
   updatedAt: string;
 }

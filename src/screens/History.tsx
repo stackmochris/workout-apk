@@ -69,13 +69,14 @@ function InsightsModal({ g, data, onClose }: { g: Exclude<Group, { kind: 'day' }
         )) : <p className="muted">Every muscle on target.</p>}
 
         <h4>Body</h4>
+        <p className="muted small">Weight average uses fasted weigh-ins when any were logged this {g.kind}, otherwise every weigh-in.</p>
         {r.body.weightAvg != null || r.body.bodyFatChange != null || r.body.waistChange != null ? (
           <>
-            {r.body.weightAvg != null && <p className="hist-line"><span>Evening weight avg</span><span>{r.body.weightAvg} kg{r.body.weightChange != null ? ` (${sign(r.body.weightChange, 2)} kg)` : ''}</span></p>}
+            {r.body.weightAvg != null && <p className="hist-line"><span>Weight avg</span><span>{r.body.weightAvg} kg{r.body.weightChange != null ? ` (${sign(r.body.weightChange, 2)} kg)` : ''}</span></p>}
             {r.body.bodyFatChange != null && <p className="hist-line"><span>Body fat</span><span>{sign(r.body.bodyFatChange)}%</span></p>}
             {r.body.waistChange != null && <p className="hist-line"><span>Waist</span><span>{sign(r.body.waistChange)} cm</span></p>}
           </>
-        ) : <p className="muted">No late-evening weigh-ins this {g.kind}.</p>}
+        ) : <p className="muted">No weigh-ins this {g.kind}.</p>}
         <button className="primary wide" onClick={onClose}>Close</button>
       </div>
     </div>

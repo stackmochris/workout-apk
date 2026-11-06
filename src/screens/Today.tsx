@@ -3,12 +3,12 @@ import { completeSession, currentPlan, preview, skipSession } from '../engine/ro
 import { DEFAULT_DAY, FLAG_INFO, SWAP_DEFAULTS } from '../data/movements';
 import { penalisedHint, penaltyState } from '../engine/week';
 import { AppData, previousFor, uid } from '../lib/store';
-import { LoggedMovement, Movement, Session, SetKind, UserPrefs } from '../types';
+import { BodyEntry, LoggedMovement, Movement, Session, SetKind, UserPrefs } from '../types';
 import RestTimer, { RestCue } from '../components/RestTimer';
 import SetRow from '../components/SetRow';
 import { suggestNext, suggestDrop } from '../engine/progression';
 import { plateLabel, plateLoad } from '../engine/plates';
-import { muscleFatigue, recoveryHint } from '../engine/analytics';
+import { checkinFastedDefault, muscleFatigue, recoveryHint } from '../engine/analytics';
 import { MUSCLES } from '../data/muscles';
 import { buzz } from '../lib/audio';
 import GvtTimer from '../components/GvtTimer';
@@ -69,7 +69,7 @@ export default function Today({ data, setData, prefs }: Props) {
   const [finish, setFinish] = useState<{ session: Session; stats: SessionStats } | null>(null);
   const [editing, setEditing] = useState<string | null>(null);
   const [collapsed, setCollapsed] = useState<Record<number, boolean>>({});
-  const [checkin, setCheckin] = useState<{ weight: string; energy: number; elbow: 'ok' | 'sore' } | null>(null);
+  const [checkin, setCheckin] = useState<{ weight: string; energy: number; elbow: 'ok' | 'sore'; fasted: boolean } | null>(null);
   const [tick, setTick] = useState(0);
   const pen = data.settings.penalty;
   const penalty = useMemo(
@@ -91,7 +91,7 @@ export default function Today({ data, setData, prefs }: Props) {
     const start = (() => { const x = new Date(); const day = x.getDay(); const diff = x.getDate() - day + (day === 0 ? -6 : 1); x.setDate(diff); x.setHours(0,0,0,0); return x; })();
     const has = data.body.some((b) => new Date(b.date) >= start);
     const skipped = sessionStorage.getItem('checkin-skipped') === start.toISOString().slice(0, 10);
-    if (!has && !skipped && !checkin) setCheckin({ weight: '', energy: 5, elbow: 'ok' });
+    if (!has && !skipped && !checkin) setCheckin({ weight: '', energy: 5, elbow: 'ok', fasted: checkinFastedDefault() });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -155,11 +155,11 @@ export default function Today({ data, setData, prefs }: Props) {
   };
   const saveCheckin = () => {
     if (!checkin) return;
-    const entry = {
+    const entry: BodyEntry = {
       id: uid(), date: new Date().toISOString(),
       weight: checkin.weight ? Number(checkin.weight) : undefined,
-      energy: checkin.energy, elbow: checkin.elbow,
-      author: 'app' as const, updatedAt: new Date().toISOString(),
+      energy: checkin.energy, elbow: checkin.elbow, fasted: checkin.fasted,
+      author: 'app', updatedAt: new Date().toISOString(),
     };
     setData((d) => ({ ...d, body: [...d.body, entry] }));
     setCheckin(null);
@@ -625,6 +625,10 @@ export default function Today({ data, setData, prefs }: Props) {
             <p className="muted">Optional. Skips until next Monday.</p>
             <label className="form">Weight (kg)
               <input inputMode="decimal" value={checkin.weight} onChange={(e) => setCheckin({ ...checkin, weight: e.target.value })} placeholder="optional" />
+            </label>
+            <label className="fasted-check">
+              <input type="checkbox" checked={checkin.fasted} onChange={(e) => setCheckin({ ...checkin, fasted: e.target.checked })} />
+              Fasted
             </label>
             <label className="form">Energy (1–10)
               <input type="range" min={1} max={10} value={checkin.energy} onChange={(e) => setCheckin({ ...checkin, energy: Number(e.target.value) })} />

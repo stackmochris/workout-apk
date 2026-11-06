@@ -1,6 +1,6 @@
 import { MUSCLES, Muscle, musclesFor } from '../data/muscles';
 import { BodyEntry, Movement, Session, SetKind } from '../types';
-import { eveningWeights } from './analytics';
+import { periodWeightAvg } from './analytics';
 import { e1rm } from './history';
 
 export interface LiftLine { id: string; name: string; e1rm: number; prevPeriod: number | null; allTimeBefore: number | null; pr: boolean; change: number | null }
@@ -42,8 +42,6 @@ function bestE1(ss: Session[]) {
   }
   return out;
 }
-
-const avg = (xs: number[]) => (xs.length ? r2(xs.reduce((a, b) => a + b, 0) / xs.length) : null);
 
 /** Change from the first to the last reading of a field inside [a, b). */
 function fieldChange(body: BodyEntry[], k: 'bodyFat' | 'waist', a: Date, b: Date) {
@@ -91,9 +89,8 @@ export function buildReport(
     return { muscle: id, label, perWeek, status: perWeek < t ? 'under' : perWeek > t * 1.5 ? 'over' : 'on' };
   });
 
-  const ev = eveningWeights(body);
-  const weightAvg = avg(ev.filter((e) => inRange(e.date, start, end)).map((e) => e.weight));
-  const prevWeightAvg = avg(ev.filter((e) => inRange(e.date, prevStart, start)).map((e) => e.weight));
+  const weightAvg = periodWeightAvg(body, start, end);
+  const prevWeightAvg = periodWeightAvg(body, prevStart, start);
 
   return {
     weeks, completed, skipped: period.filter((s) => s.status === 'skipped').length, planned, missed: Math.max(0, planned - completed),
