@@ -122,7 +122,7 @@ export interface Settings {
     watch: string[];
   };
   theme: Theme;
-  /** Local display name. No account required. */
+  /** Local display name. No account required. Preferred name on Others Last. */
   displayName?: string;
   /** Drives the set/rep sub-heading shown on each movement. */
   goal: Goal;
