@@ -1,6 +1,7 @@
 import { VERSION } from '../components/UpdateBanner';
 import { useState } from 'react';
 import { useAuth } from '../lib/auth';
+import SheetExport from '../components/SheetExport';
 import { AppData, exportCsv, exportJson, freshData } from '../lib/store';
 import { useSyncPending } from '../lib/useSyncPending';
 import { listSnapshots, parseBackup, readSnapshot } from '../lib/backup';
@@ -184,8 +185,9 @@ export default function SettingsScreen({ data, setData }: Props) {
       <div className="card form">
         <h3>Data</h3>
         <p className="muted">{data.sessions.length} sessions \u00b7 {data.movements.length} movements \u00b7 stored on this device</p>
-        <button className="primary wide" onClick={() => exportJson(data)}>Export JSON (full backup)</button>
-        <button className="ghost wide" onClick={() => exportCsv(data)}>Export CSV (sets and body stats)</button>
+        <SheetExport data={data} />
+        <button className="ghost wide" type="button" onClick={() => exportCsv(data)}>Download CSV (sets and body stats)</button>
+        <button className="ghost wide" type="button" onClick={() => exportJson(data)}>Export JSON (full backup)</button>
         <label className="ghost wide file">Restore from JSON file<input type="file" accept="application/json,.json" onChange={(e) => { void importFile(e.target.files?.[0]); e.target.value = ''; }} /></label>
         {msg && <p className="muted small">{msg}</p>}
         <h4>Automatic backups</h4>

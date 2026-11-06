@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { plateLoad, roundLoadable } from './plates';
 import { suggestNext } from './progression';
 import { e1rm } from './history';
-import { bodyCsv, csvCell, sessionsCsv } from './csv';
+import { BODY_HEADERS, bodyCsv, bodyRows, csvCell, sessionsCsv, weekStartLabel } from './csv';
 import { DEFAULT_SETTINGS, migrate } from './migrate';
 import { SUPERSET_FATIGUE_MULT, checkinFastedDefault, fastedWeeklyWeights, liftSeries, muscleFatigue, periodWeightAvg, recoveryHint, supersetUsage, weeklyMuscleSets } from './analytics';
 import { weekStart } from './week';
@@ -103,15 +103,48 @@ describe('CSV export', () => {
   });
   it('writes body stats sorted by date, with fasted as yes or empty', () => {
     const e = (date: string, extra: Partial<BodyEntry> = {}): BodyEntry => ({ id: date, date, author: 'app', updatedAt: date, ...extra });
-    const lines = bodyCsv([
+    const entries = [
       e('2026-10-02', { weight: 90, fasted: true, energy: 7, elbow: 'ok' }),
       e('2026-10-01', { weight: 91, fasted: false, bodyFat: 18, waist: 86 }),
       e('2026-10-03', { weight: 89 }),
-    ]).trim().split('\n');
-    expect(lines[0]).toBe('date,weight_kg,body_fat_pct,waist_cm,energy,elbow,fasted');
-    expect(lines[1]).toBe('2026-10-01,91,18,86,,,');
-    expect(lines[2]).toBe('2026-10-02,90,,,7,ok,yes');
-    expect(lines[3]).toBe('2026-10-03,89,,,,,');
+    ];
+    const lines = bodyCsv(entries).trim().split('\n');
+    const rows = bodyRows(entries);
+    const monday = weekStartLabel(weekStart(new Date('2026-10-01')));
+    expect(lines[0]).toBe(BODY_HEADERS.join(','));
+    expect(lines[0]).toBe('date,weight_kg,body_fat_pct,waist_cm,energy,elbow,fasted,week_start,weekly_fasted_avg');
+    expect(lines.slice(1)).toEqual(rows.map((r) => r.map(csvCell).join(',')));
+    expect(rows.map((r) => r.slice(0, 7))).toEqual([
+      ['2026-10-01', 91, 18, 86, '', '', ''],
+      ['2026-10-02', 90, '', '', 7, 'ok', 'yes'],
+      ['2026-10-03', 89, '', '', '', '', ''],
+    ]);
+    expect(rows.every((r) => r[7] === monday && r[8] === 90)).toBe(true);
+    expect(weekStart(new Date(monday)).getDay()).toBe(1);
+  });
+  it('repeats the Monday fasted average on every row in the week', () => {
+    const e = (d: number, h: number, extra: Partial<BodyEntry>): BodyEntry => ({
+      id: `${d}-${h}`, date: new Date(2026, 9, d, h).toISOString(), author: 'app', updatedAt: '', ...extra,
+    });
+    const rows = bodyRows([
+      e(8, 22, { weight: 90, fasted: false }),
+      e(6, 7, { weight: 80, fasted: true }),
+      e(7, 8, { weight: 82, fasted: true }),
+      e(9, 9, { weight: 88 }),
+      e(13, 7, { weight: 79, fasted: true }),
+      e(14, 8, { weight: 70 }),
+    ]);
+    const firstMonday = weekStartLabel(weekStart(new Date(2026, 9, 5)));
+    const secondMonday = weekStartLabel(weekStart(new Date(2026, 9, 12)));
+    expect(rows.map((r) => [r[6], r[7], r[8]])).toEqual([
+      ['yes', firstMonday, 81],
+      ['yes', firstMonday, 81],
+      ['', firstMonday, 81],
+      ['', firstMonday, 81],
+      ['yes', secondMonday, 79],
+      ['', secondMonday, 79],
+    ]);
+    expect(weekStart(new Date(2026, 9, 5)).getDay()).toBe(1);
   });
 });
 
