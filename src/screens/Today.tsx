@@ -2,7 +2,10 @@ import { Fragment, useEffect, useMemo, useState } from 'react';
 import { completeSession, currentPlan, preview, skipSession } from '../engine/rotation';
 import { DEFAULT_DAY, FLAG_INFO, SWAP_DEFAULTS } from '../data/movements';
 import { penalisedHint, penaltyState } from '../engine/week';
+import { syncBody, syncSession } from '../lib/cloudSync';
+import { auth } from '../lib/firebase';
 import { AppData, previousFor, uid } from '../lib/store';
+import { syncDisplayName } from '../lib/sync';
 import { BodyEntry, LoggedMovement, Movement, Session, SetKind, UserPrefs } from '../types';
 import RestTimer, { RestCue } from '../components/RestTimer';
 import SetRow from '../components/SetRow';
@@ -162,6 +165,7 @@ export default function Today({ data, setData, prefs }: Props) {
       author: 'app', updatedAt: new Date().toISOString(),
     };
     setData((d) => ({ ...d, body: [...d.body, entry] }));
+    syncBody(entry);
     setCheckin(null);
   };
   const skipCheckin = () => {
@@ -285,6 +289,9 @@ export default function Today({ data, setData, prefs }: Props) {
     setBrowse(null);
     setSwapping(false);
     setFinish(null);
+    if (session.status === 'completed') {
+      syncSession(session, syncDisplayName(data.settings.displayName, auth?.currentUser?.displayName, auth?.currentUser?.email));
+    }
   };
 
   const logGvt = (mi: number, weight: number | null, reps: number[]) => {

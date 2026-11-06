@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { syncBody } from '../lib/cloudSync';
 import { AppData, uid } from '../lib/store';
 import { fastedWeeklyWeights, liftSeries, muscleFatigue, supersetUsage, trackedLifts, weeklyMuscleSets } from '../engine/analytics';
 import { MUSCLES } from '../data/muscles';
@@ -105,6 +106,7 @@ function BodyStats({ data, setData }: Props) {
     const entry: BodyEntry = { id: uid(), date: new Date().toISOString(), weight: num(w), bodyFat: num(bf), waist: num(waist), fasted, author: 'app', updatedAt: new Date().toISOString() };
     if (entry.weight == null && entry.bodyFat == null && entry.waist == null) return;
     setData((d) => ({ ...d, body: [...d.body, entry] }));
+    syncBody(entry);
     setW(''); setBf(''); setWaist(''); setFasted(true);
   };
 

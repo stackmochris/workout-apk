@@ -1,6 +1,8 @@
 import { VERSION } from '../components/UpdateBanner';
 import { useState } from 'react';
+import { useAuth } from '../lib/auth';
 import { AppData, exportCsv, exportJson, freshData } from '../lib/store';
+import { useSyncPending } from '../lib/useSyncPending';
 import { listSnapshots, parseBackup, readSnapshot } from '../lib/backup';
 import { notificationsSupported, requestNotifications } from '../lib/alerts';
 import { plateLabel, plateLoad } from '../engine/plates';
@@ -29,6 +31,10 @@ const GOALS: { id: Goal; label: string }[] = [
 
 export default function SettingsScreen({ data, setData }: Props) {
   const s = data.settings;
+  const { user, ready, busy, error, signInGoogle, signInEmail, signUpEmail, signOutUser } = useAuth();
+  const pending = useSyncPending(user?.uid);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const set = (patch: Partial<typeof s>) => setData((d) => ({ ...d, settings: { ...d.settings, ...patch } }));
   const num = (v: string, f: number) => (Number.isFinite(Number(v)) && v !== '' ? Number(v) : f);
   const [plateText, setPlateText] = useState(s.plates.join(', '));
@@ -57,8 +63,38 @@ export default function SettingsScreen({ data, setData }: Props) {
     <section>
       <header className="hero"><small>Preferences</small><h1>Settings</h1></header>
       <div className="card form">
+        <h3>Account</h3>
+        {!ready && <p className="muted">Checking sign-in…</p>}
+        {ready && user && (
+          <>
+            <p><b>{user.displayName || s.displayName || 'Signed in'}</b></p>
+            {user.email && <p className="muted">{user.email}</p>}
+            <p className="muted small">Workouts on this device sync while you are signed in. You can keep logging if you sign out.</p>
+            {pending > 0 && <p className="muted small">{pending} change{pending === 1 ? '' : 's'} waiting to sync.</p>}
+            <button className="ghost wide" type="button" onClick={() => { void signOutUser(); }}>Sign out</button>
+          </>
+        )}
+        {ready && !user && (
+          <>
+            <p className="muted">Optional. Logging works without an account. Sign in to sync this device and see Others Last.</p>
+            <button className="primary wide" type="button" disabled={busy} onClick={() => { void signInGoogle(); }}>Continue with Google</button>
+            <div className="account-fields">
+              <label className="stack">Email
+                <input type="email" autoComplete="username" value={email} onChange={(e) => setEmail(e.target.value)} />
+              </label>
+              <label className="stack">Password
+                <input type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} />
+              </label>
+            </div>
+            <button className="primary wide" type="button" disabled={busy} onClick={() => { void signInEmail(email, password).then((ok) => { if (ok) setPassword(''); }); }}>Sign in with email</button>
+            <button className="ghost wide" type="button" disabled={busy} onClick={() => { void signUpEmail(email, password).then((ok) => { if (ok) setPassword(''); }); }}>Create account</button>
+          </>
+        )}
+        {error && <p className="muted small" role="alert">{error}</p>}
+      </div>
+      <div className="card form">
         <h3>Your name</h3>
-        <p className="muted">Stored on this phone. Firebase is only needed when others need to see it.</p>
+        <p className="muted">Saved on this phone. When you are signed in, this is the name on Others Last.</p>
         <label>Name
           <input value={s.displayName ?? ''} onChange={(e) => set({ displayName: e.target.value })} placeholder="e.g. Chris" />
         </label>
