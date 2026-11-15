@@ -42,6 +42,7 @@
   --fs-display: 34px;
   --touch-min: 48px;
   --set-control: 56px;
+  --tab-bar-height: calc(var(--set-control) + 1px + env(safe-area-inset-bottom));
   --session-bar-max: 560px;
   --session-bar-clearance: 164px;
   --console-dark: #101d15;

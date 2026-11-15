@@ -122,14 +122,14 @@ function Shell() {
           {route === 'others' ? <Others /> : <SettingsScreen data={data} setData={setData} />}
         </>}
       </main>
-      {(!active || tab !== 'today') && <nav className="tabs" aria-label="Main navigation">
+      <nav className="tabs" aria-label="Main navigation">
         {(['today', 'history', 'progress', 'more'] as Tab[]).map((t) => (
           <button key={t} className={tab === t ? 'on' : ''} aria-current={tab === t ? 'page' : undefined} onClick={() => navigate(t)}>
             <span aria-hidden="true">{t === 'today' ? '●' : t === 'history' ? '☰' : t === 'progress' ? '↗' : '⋯'}</span>
             {t === 'today' && active ? 'Resume workout' : t[0].toUpperCase() + t.slice(1)}
           </button>
         ))}
-      </nav>}
+      </nav>
     </div>
   );
 }
