@@ -33,7 +33,9 @@ export default function RestTimer({ cue, onChange, sound, vibrate }: {
   const left = Math.max(0, Math.ceil((cue.endAt - Date.now()) / 1000));
   return (
     <div className="session-rest">
-      <strong role="timer">{left ? `Rest ${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}` : 'Ready for next set'}</strong>
+      <strong role="timer">{left ? <>
+        <small>Rest</small> {Math.floor(left / 60)}:{String(left % 60).padStart(2, '0')}
+      </> : 'Ready'}</strong>
       <button className="ghost" onClick={() => onChange({ endAt: Math.max(Date.now(), cue.endAt) + 15_000, seconds: cue.seconds + 15 })}>+15s</button>
       <button className="ghost" onClick={() => onChange()}>{left ? 'Skip rest' : 'Dismiss'}</button>
     </div>

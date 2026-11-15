@@ -44,7 +44,15 @@
   --set-control: 56px;
   --session-bar-max: 560px;
   --session-bar-clearance: 164px;
-  --session-accent: #176541;
+  --console-dark: #101d15;
+  --console-light: #f5f8ed;
+  --console-muted: #bdcbbf;
+  --console-paper: #f7f5ed;
+  --console-lime: #c8fa53;
+  --console-line: #586959;
+  --console-display: "Barlow Condensed", "Roboto Condensed", "Arial Narrow", sans-serif-condensed, system-ui, sans-serif;
+  --console-hero-size: clamp(2.75rem, 10vw, 4.5rem);
+  --console-number-size: clamp(1.625rem, 6vw, 2.125rem);
   --sr-only-size: 1px;
   color-scheme: light;
 }

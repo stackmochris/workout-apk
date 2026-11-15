@@ -66,9 +66,22 @@ export default function FinishSheet({
 
   return (
     <div className="sheet" onClick={onClose}>
-      <div className="sheet-body" onClick={(e) => e.stopPropagation()} style={{ maxHeight: '90vh', overflow: 'auto' }}>
-        <h3>Workout saved</h3>
-        <p className="muted small">{focus} · {type}</p>
+      <div className="sheet-body receipt" onClick={(e) => e.stopPropagation()} style={{ maxHeight: '90vh', overflow: 'auto' }}>
+        <header className="receipt-heading">
+          <h3>Workout saved</h3>
+          <p>{focus} · {type}</p>
+        </header>
+
+        {stats.prs.length > 0 && (
+          <div className="receipt-records">
+            <strong>{stats.prs.length === 1 ? 'New personal record' : `${stats.prs.length} new personal records`}</strong>
+            <ul>
+              {stats.prs.map((p) => (
+                <li key={p.movement}>{p.movement}: <b className="tick-num">{p.weight}</b> kg × <b className="tick-num">{p.reps}</b></li>
+              ))}
+            </ul>
+          </div>
+        )}
 
         <div className="stats-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, margin: '12px 0' }}>
           <Stat label="Time" value={stats.durationMin != null ? `${stats.durationMin} min` : '\u2013'} on={include.time} toggle={() => setInclude((s) => ({ ...s, time: !s.time }))} />
@@ -78,17 +91,6 @@ export default function FinishSheet({
           <Stat label="To failure" value={String(stats.failureSets)} on={include.failure} toggle={() => setInclude((s) => ({ ...s, failure: !s.failure }))} />
           <Stat label="Drop sets" value={String(stats.dropSets)} on={include.drops} toggle={() => setInclude((s) => ({ ...s, drops: !s.drops }))} />
         </div>
-
-        {stats.prs.length > 0 && (
-          <div style={{ marginBottom: 12 }}>
-            <strong>PRs</strong>
-            <ul className="muted small">
-              {stats.prs.map((p) => (
-                <li key={p.movement}>{p.movement}: <b className="tick-num">{p.weight}</b> kg × <b className="tick-num">{p.reps}</b></li>
-              ))}
-            </ul>
-          </div>
-        )}
 
         <input ref={fileRef} type="file" accept="image/*" capture="environment" hidden onChange={onFile} />
         <button className="ghost wide" onClick={() => fileRef.current?.click()}>
