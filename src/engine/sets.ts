@@ -1,7 +1,7 @@
 import { SetEntry } from '../types';
 
-/** Apply a reps/weight/drop edit. A set counts as done as soon as reps is entered; clearing reps unticks it. */
-export function editSet(s: SetEntry, patch: { reps?: number | null; weight?: number | null; dropStart?: number | null; dropEnd?: number | null }): SetEntry {
+/** Draft edits retain completion state unless explicitly logged or undone. */
+export function editSet(s: SetEntry, patch: Partial<SetEntry>): SetEntry {
   const next = { ...s, ...patch };
-  return { ...next, done: next.reps != null };
+  return { ...next, done: next.done && next.reps != null };
 }

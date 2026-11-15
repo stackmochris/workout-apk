@@ -75,12 +75,21 @@ async function click(button: HTMLButtonElement) {
   });
 }
 
+async function openFinish() {
+  await click(findButton((label) => label === 'Start workout'));
+  const log = document.querySelector<HTMLButtonElement>('[aria-label="Log set 1"]');
+  if (!log) throw new Error('Log set 1 missing');
+  await click(log);
+  await click(findButton((label) => label === 'Finish workout'));
+}
+
 async function finishWorkout() {
-  await click(findButton((label) => label === 'Finish session'));
-  const sheet = [...document.querySelectorAll('.sheet')].find((node) => node.querySelector('h3')?.textContent?.trim().startsWith('Finish '));
-  if (!sheet) throw new Error('Finish sheet did not open');
+  await openFinish();
   expect(exportDialog()).toBeNull();
-  await click(findButton((label) => label === 'Finish', sheet));
+  await click(findButton((label) => label === 'Save workout'));
+  expect(exportDialog()).toBeNull();
+  expect(document.body.textContent).toContain('Workout saved');
+  await click(findButton((label) => label === 'Export'));
 }
 
 describe('finish workout sheet prompt', () => {
@@ -123,7 +132,7 @@ describe('finish workout sheet prompt', () => {
     });
   }
 
-  it('asks to export only after the workout is saved', async () => {
+  it('offers optional export after the workout is saved', async () => {
     await renderToday();
     expect(exportDialog()).toBeNull();
     await finishWorkout();
@@ -136,16 +145,14 @@ describe('finish workout sheet prompt', () => {
 
   it('does not export when the finish sheet is cancelled', async () => {
     await renderToday();
-    await click(findButton((label) => label === 'Finish session'));
-    const sheet = [...document.querySelectorAll('.sheet')].find((node) => node.querySelector('h3')?.textContent?.trim().startsWith('Finish '));
-    if (!sheet) throw new Error('Finish sheet did not open');
-    await click(findButton((label) => label === 'Cancel', sheet));
+    await openFinish();
+    await click(findButton((label) => label === 'Keep logging'));
     expect(sessionCount()).toBe(0);
     expect(exportDialog()).toBeNull();
     expect(exportWorkoutSheet).not.toHaveBeenCalled();
   });
 
-  it('does not export when they choose Not now, then asks again on the next finish', async () => {
+  it('can dismiss export and choose it on a later receipt', async () => {
     await renderToday();
     await finishWorkout();
     const dialog = exportDialog();
@@ -154,6 +161,7 @@ describe('finish workout sheet prompt', () => {
     expect(exportDialog()).toBeNull();
     expect(exportWorkoutSheet).not.toHaveBeenCalled();
     expect(sessionCount()).toBe(1);
+    await click(findButton((label) => label === 'Done'));
 
     await finishWorkout();
     expect(sessionCount()).toBe(2);
@@ -167,6 +175,24 @@ describe('finish workout sheet prompt', () => {
     expect(sessionCount()).toBe(1);
     expect(exportDialog()).toBeNull();
     expect(exportWorkoutSheet).not.toHaveBeenCalled();
+  });
+
+  it('preserves a logged set when swapping the remaining work', async () => {
+    await renderToday();
+    await click(findButton((label) => label === 'Start workout'));
+    const log = document.querySelector<HTMLButtonElement>('[aria-label="Log set 1"]')!;
+    await click(log);
+    await click(findButton((label) => label === 'Swap exercise'));
+    const choice = document.querySelector<HTMLButtonElement>('.pick button');
+    if (!choice) throw new Error('No replacement exercises');
+    await click(choice);
+    await click(findButton((label) => label === 'Finish workout'));
+    expect(document.querySelector('[role="dialog"]')?.textContent).toContain('1 logged sets');
+    await click(findButton((label) => label === 'Save workout'));
+    const [session] = vi.mocked(syncSession).mock.calls[0];
+    expect(session.movements).toHaveLength(1);
+    expect(session.movements[0].sets).toHaveLength(1);
+    expect(session.movements[0].sets[0].done).toBe(true);
   });
 
   it('exports the finished workout when they accept', async () => {

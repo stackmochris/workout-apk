@@ -30,17 +30,22 @@ describe('parseKg', () => {
   });
 });
 
-describe('auto-tick', () => {
+describe('explicit set logging', () => {
   const blank = { reps: null, weight: null, done: false };
-  it('ticks once reps is entered', () => {
+  it('keeps edits as a draft until explicitly logged', () => {
     expect(editSet(blank, { weight: 50 }).done).toBe(false);
-    expect(editSet(editSet(blank, { weight: 50 }), { reps: 8 })).toEqual({ weight: 50, reps: 8, done: true });
+    const draft = editSet(editSet(blank, { weight: 50 }), { reps: 8 });
+    expect(draft).toEqual({ weight: 50, reps: 8, done: false });
+    expect(editSet(draft, { done: true }).done).toBe(true);
   });
   it('unticks when reps is cleared', () => {
     expect(editSet({ weight: 50, reps: 8, done: true }, { reps: null }).done).toBe(false);
   });
+  it('preserves entered numbers when logging is undone', () => {
+    expect(editSet({ weight: 50, reps: 8, done: true }, { done: false })).toEqual({ weight: 50, reps: 8, done: false });
+  });
   it('reps of 0 still counts as entered', () => {
-    expect(editSet(blank, { reps: 0 }).done).toBe(true);
+    expect(editSet(blank, { reps: 0, done: true }).done).toBe(true);
   });
 });
 

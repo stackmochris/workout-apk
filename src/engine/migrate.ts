@@ -11,7 +11,7 @@ export interface AppData {
   movements: Movement[];
   rotation: RotationState;
   sessions: Session[];
-  draft: { focus: string; type: string; movements: LoggedMovement[]; gvtRepsPerMinute?: number[]; startedAt?: string; lastInputAt?: string } | null;
+  draft: { focus: string; type: string; movements: LoggedMovement[]; gvtRepsPerMinute?: number[]; startedAt?: string; lastInputAt?: string; rest?: { endAt: number; seconds: number } } | null;
   settings: Settings;
   body: BodyEntry[];
 }

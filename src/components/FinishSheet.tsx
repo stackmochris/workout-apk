@@ -5,14 +5,14 @@ export default function FinishSheet({
   stats,
   focus,
   type,
-  onCancel,
-  onConfirm,
+  onClose,
+  onExport,
 }: {
   stats: SessionStats;
   focus: string;
   type: string;
-  onCancel: () => void;
-  onConfirm: () => void;
+  onClose: () => void;
+  onExport: () => void;
 }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [photo, setPhoto] = useState<string | null>(null);
@@ -50,7 +50,6 @@ export default function FinishSheet({
         const file = new File([blob], 'workout.jpg', { type: blob.type || 'image/jpeg' });
         if (navigator.canShare({ files: [file] })) {
           await navigator.share({ title: 'Workout', text: lines, files: [file] });
-          onConfirm();
           return;
         }
       }
@@ -63,14 +62,13 @@ export default function FinishSheet({
     } catch {
       /* user cancelled share */
     }
-    onConfirm();
   };
 
   return (
-    <div className="sheet" onClick={onCancel}>
+    <div className="sheet" onClick={onClose}>
       <div className="sheet-body" onClick={(e) => e.stopPropagation()} style={{ maxHeight: '90vh', overflow: 'auto' }}>
-        <h3>Finish {focus}</h3>
-        <p className="muted small">{type} session</p>
+        <h3>Workout saved</h3>
+        <p className="muted small">{focus} · {type}</p>
 
         <div className="stats-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, margin: '12px 0' }}>
           <Stat label="Time" value={stats.durationMin != null ? `${stats.durationMin} min` : '\u2013'} on={include.time} toggle={() => setInclude((s) => ({ ...s, time: !s.time }))} />
@@ -117,8 +115,9 @@ export default function FinishSheet({
         )}
 
         <div className="row" style={{ marginTop: 16 }}>
-          <button className="ghost" onClick={onCancel}>Cancel</button>
-          <button className="primary" onClick={share}>{photo ? 'Share & finish' : 'Finish'}</button>
+          <button className="ghost" onClick={onClose}>Done</button>
+          <button className="ghost" onClick={onExport}>Export</button>
+          <button className="primary" onClick={share}>Share</button>
         </div>
       </div>
     </div>

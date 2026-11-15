@@ -1,60 +1,41 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { beep } from '../lib/audio';
 import { alerts } from '../lib/alerts';
 
-export interface RestCue { n: number; seconds: number; label?: string }
+interface RestCue { endAt: number; seconds: number }
 
-const RING = 15;
-const RING_C = 2 * Math.PI * RING;
-
-/** Rest countdown. A new cue (n changes) restarts it; it starts by itself when a set is ticked. */
-
-export default function RestTimer({ cue, sound, vibrate }: { cue: RestCue; sound: boolean; vibrate: boolean }) {
-  const [left, setLeft] = useState<number | null>(null);
-  const [total, setTotal] = useState(0);
-  const endAt = useRef(0);
-  const label = cue.label ?? 'Rest';
-
+export default function RestTimer({ cue, onChange, sound, vibrate }: {
+  cue?: RestCue;
+  onChange: (cue?: RestCue) => void;
+  sound: boolean;
+  vibrate: boolean;
+}) {
+  const [, refresh] = useState(0);
+  const endAt = cue?.endAt;
   useEffect(() => {
-    if (cue.n > 0) {
-      endAt.current = Date.now() + cue.seconds * 1000;
-      setTotal(cue.seconds);
-      setLeft(cue.seconds);
-      alerts.running(endAt.current, label);
-    }
-  }, [cue.n]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  useEffect(() => {
-    if (left == null) return;
-    const id = setInterval(() => {
-      const l = Math.max(0, Math.ceil((endAt.current - Date.now()) / 1000));
-      setLeft(l);
-      if (l > 0 && l <= 3 && sound) beep('tick');
-      if (l === 0) {
-        clearInterval(id);
+    if (endAt == null || endAt <= Date.now()) return;
+    const label = 'Rest';
+    alerts.running(endAt, label);
+    const id = window.setInterval(() => {
+      refresh((n) => n + 1);
+      const left = Math.ceil((endAt - Date.now()) / 1000);
+      if (left <= 0) {
+        window.clearInterval(id);
         alerts.finished(label, { sound, vibrate });
-        setTimeout(() => setLeft(null), 1500);
+      } else if (left <= 3 && sound) {
+        beep('tick');
       }
     }, 1000);
-    return () => clearInterval(id);
-  }, [left == null, cue.n]); // eslint-disable-line react-hooks/exhaustive-deps
+    return () => { window.clearInterval(id); alerts.cancel(); };
+  }, [endAt, sound, vibrate]);
 
-  if (left == null) return null;
-  const mm = Math.floor(left / 60);
-  const ss = String(left % 60).padStart(2, '0');
-  const remain = total > 0 ? left / total : 0;
+  if (!cue) return null;
+  const left = Math.max(0, Math.ceil((cue.endAt - Date.now()) / 1000));
   return (
-    <div className={`rest ${left <= 10 ? 'warn' : ''} ${left === 0 ? 'go' : ''}`} role="timer" aria-label={`${label} ${left === 0 ? 'done' : `${mm}:${ss}`}`}>
-      <svg className="rest-ring" viewBox="0 0 40 40" aria-hidden="true">
-        <circle cx="20" cy="20" r={RING} className="bg" />
-        <circle cx="20" cy="20" r={RING} className="fill" strokeDasharray={RING_C} strokeDashoffset={RING_C * remain} />
-      </svg>
-      <div className="rest-copy">
-        <span>{label}</span>
-        <strong>{left === 0 ? 'Go' : `${mm}:${ss}`}</strong>
-      </div>
-      <button onClick={() => { endAt.current += 15000; setLeft((l) => (l ?? 0) + 15); setTotal((t) => t + 15); alerts.running(endAt.current, label); }}>+15s</button>
-      <button onClick={() => { setLeft(null); alerts.cancel(); }}>Skip</button>
+    <div className="session-rest">
+      <strong role="timer">{left ? `Rest ${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}` : 'Ready for next set'}</strong>
+      <button className="ghost" onClick={() => onChange({ endAt: Math.max(Date.now(), cue.endAt) + 15_000, seconds: cue.seconds + 15 })}>+15s</button>
+      <button className="ghost" onClick={() => onChange()}>{left ? 'Skip rest' : 'Dismiss'}</button>
     </div>
   );
 }

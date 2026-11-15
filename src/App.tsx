@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { setNotificationsEnabled } from './lib/alerts';
 import { AuthProvider, useAuth } from './lib/auth';
 import { catchUp } from './lib/cloudSync';
@@ -14,7 +14,7 @@ import Others from './screens/Others';
 import Onboarding from './components/Onboarding';
 import { UserPrefs } from './types';
 
-type Tab = 'today' | 'history' | 'progress' | 'summary' | 'others' | 'settings';
+type Tab = 'today' | 'history' | 'progress' | 'more';
 
 const PREFS_KEY = 'workout-apk:prefs';
 
@@ -47,6 +47,18 @@ function Shell() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.uid]);
   const [tab, setTab] = useState<Tab>('today');
+  const todayScroll = useRef(0);
+  const navigate = (next: Tab) => {
+    if (next === tab) return;
+    if (tab === 'today') todayScroll.current = window.scrollY;
+    setTab(next);
+  };
+  useEffect(() => {
+    window.scrollTo(0, tab === 'today' ? todayScroll.current : 0);
+  }, [tab]);
+  const [progressView, setProgressView] = useState<'progress' | 'summary'>('progress');
+  const [moreView, setMoreView] = useState<'settings' | 'others'>('settings');
+  const active = !!data.draft?.startedAt;
   const done = weekCount(data.sessions);
   const unlocked = done >= data.settings.summaryThreshold;
 
@@ -69,21 +81,33 @@ function Shell() {
     <div className={`app ${themeClass}`}>
       <UpdateBanner />
       <main>
-        {tab === 'today' && <Today data={data} setData={setData} prefs={prefs} />}
+        <div hidden={tab !== 'today'}>
+          <Today data={data} setData={setData} prefs={prefs} onHistory={() => navigate('history')} />
+        </div>
         {tab === 'history' && <History data={data} />}
-        {tab === 'progress' && <Progress data={data} setData={setData} />}
-        {tab === 'summary' && <Summary data={data} />}
-        {tab === 'others' && <Others />}
-        {tab === 'settings' && <SettingsScreen data={data} setData={setData} />}
+        {tab === 'progress' && <>
+          <div className="view-switch">
+            <button className="chip" aria-pressed={progressView === 'progress'} onClick={() => setProgressView('progress')}>Progress</button>
+            <button className="chip" aria-pressed={progressView === 'summary'} onClick={() => setProgressView('summary')}>Weekly summary{!unlocked && ' 🔒'}</button>
+          </div>
+          {progressView === 'summary' ? <Summary data={data} /> : <Progress data={data} setData={setData} />}
+        </>}
+        {tab === 'more' && <>
+          <div className="view-switch">
+            <button className="chip" aria-pressed={moreView === 'settings'} onClick={() => setMoreView('settings')}>Settings</button>
+            <button className="chip" aria-pressed={moreView === 'others'} onClick={() => setMoreView('others')}>Others</button>
+          </div>
+          {moreView === 'others' ? <Others /> : <SettingsScreen data={data} setData={setData} />}
+        </>}
       </main>
-      <nav className="tabs">
-        {(['today', 'history', 'progress', 'summary', 'others', 'settings'] as Tab[]).map((t) => (
-          <button key={t} className={tab === t ? 'on' : ''} onClick={() => setTab(t)}>
-            <span>{t === 'today' ? '●' : t === 'history' ? '☰' : t === 'progress' ? '↗' : t === 'summary' ? (unlocked ? '▲' : '🔒') : t === 'others' ? '◎' : '⚙'}</span>
-            {t[0].toUpperCase() + t.slice(1)}
+      {(!active || tab !== 'today') && <nav className="tabs" aria-label="Main navigation">
+        {(['today', 'history', 'progress', 'more'] as Tab[]).map((t) => (
+          <button key={t} className={tab === t ? 'on' : ''} aria-current={tab === t ? 'page' : undefined} onClick={() => navigate(t)}>
+            <span aria-hidden="true">{t === 'today' ? '●' : t === 'history' ? '☰' : t === 'progress' ? '↗' : '⋯'}</span>
+            {t === 'today' && active ? 'Resume workout' : t[0].toUpperCase() + t.slice(1)}
           </button>
         ))}
-      </nav>
+      </nav>}
     </div>
   );
 }
