@@ -6,6 +6,13 @@ It runs a 5-day split (Chest, Shoulder, Back, Arm, Leg). Each focus has its own 
 
 The full product brief is in [docs/brief.md](docs/brief.md).
 
+## Find the source for a task
+
+- **Rotation, progression or reporting.** Open the relevant [engine code and tests](src/engine). Read the [brief](docs/brief.md) or [progression checklist](docs/progression-checklist.md) for intent and acceptance, and check the tests before repeating a roadmap status as shipped.
+- **Workout completion and Google Sheets export.** Start with the [Today completion test](src/screens/Today.finishExport.test.tsx), [finish-export logic](src/lib/finishExport.ts), and [Sheets adapter](src/lib/exportWorkoutSheet.ts).
+- **Persistence or sync.** Start with [local store](src/lib/store.ts), then [sync tests](src/lib/sync.test.ts) for the relevant path. Keep user data out of context excerpts.
+- **Release.** Use the checked-in [Pages workflow](.github/workflows/deploy-pages.yml). Release status requires a deployment record.
+
 ## Stack
 
 - React 18 + TypeScript, built with Vite
@@ -58,4 +65,4 @@ docs/brief.md             product brief
 
 ## Deploying to GitHub Pages
 
-The Pages workflow lives at `docs/deploy/pages.yml`. To enable it, move it to `.github/workflows/pages.yml` and set **Settings → Pages → Source** to *GitHub Actions*. GitHub Pages on a private repository needs a paid GitHub plan (Pro or higher).
+The active workflow definition is [Deploy to GitHub Pages](.github/workflows/deploy-pages.yml). It runs on pushes to the main branch and can also be triggered manually. Check repository Pages settings and the workflow run for deployment status. The [older setup recipe](docs/deploy/pages.yml) is a reference.
