@@ -118,8 +118,11 @@ export function muscleFatigue(sessions: Session[], movements: Movement[], now = 
   for (const s of sessions) {
     if (s.status !== 'completed') continue;
     const h = (now.getTime() - new Date(s.date).getTime()) / 3600e3;
-    if (h < 0 || h > 24 * 7) continue;
-    const decay = Math.pow(0.5, h / halfLifeH);
+    const maxAgeH = 72;
+    if (h < 0 || h >= maxAgeH) continue;
+    // Keep the early decay and taper the remaining contribution to zero over the final day.
+    const taper = Math.min(1, (maxAgeH - h) / 24);
+    const decay = Math.pow(0.5, h / halfLifeH) * taper;
     const groups = supersetIds(s.movements);
     for (const mv of s.movements) {
       const n = mv.sets.filter(hardSet).length;

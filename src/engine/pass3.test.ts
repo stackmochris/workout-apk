@@ -213,9 +213,19 @@ describe('analytics', () => {
   });
   it('fatigue fades with time and drives recovery hints', () => {
     const f = muscleFatigue(sessions, SEED_MOVEMENTS, now);
-    expect(f.lats!).toBeGreaterThan(f.chest!);
+    expect(f.lats!).toBeGreaterThan(f.chest ?? 0);
     expect(recoveryHint('Back', f, 0.15)).toContain('lats');
     expect(recoveryHint('Leg', f)).toEqual([]);
+  });
+  it('tapers old sessions and drops them at 72 hours', () => {
+    const atAge = (hours: number) => sessions.map((session) => ({
+      ...session,
+      date: new Date(now.getTime() - hours * 3600_000).toISOString(),
+    }));
+    expect(muscleFatigue(atAge(60), SEED_MOVEMENTS, now).lats!)
+      .toBeLessThan(muscleFatigue(atAge(48), SEED_MOVEMENTS, now).lats!);
+    expect(muscleFatigue(atAge(72), SEED_MOVEMENTS, now)).toEqual({});
+    expect(muscleFatigue(atAge(96), SEED_MOVEMENTS, now)).toEqual({});
   });
   it('averages fasted weigh-ins by week and leaves unmarked logs out', () => {
     const e = (d: number, h: number, extra: Partial<BodyEntry>): BodyEntry => ({ id: `${d}${h}`, date: new Date(2026, 9, d, h, h === 23 ? 59 : 0).toISOString(), author: 'app', updatedAt: '', ...extra });

@@ -51,7 +51,7 @@ export default function Progress({ data, setData }: Props) {
 
       <div className="card">
         <h3>Recent training load</h3>
-        <p className="muted">Estimated from recent hard sets, weighted towards newer workouts.</p>
+        <p className="muted">Estimated from hard sets in the last 72 hours, weighted towards newer workouts.</p>
         <BodyMap load={fatigue} />
       </div>
 
