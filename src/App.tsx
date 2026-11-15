@@ -16,6 +16,22 @@ import { UserPrefs } from './types';
 
 type Tab = 'today' | 'history' | 'progress' | 'more';
 
+type Route = Tab | 'summary' | 'others';
+
+function readRoute(): Route {
+  const hash = window.location.hash.slice(1);
+  switch (hash) {
+    case 'history':
+    case 'progress':
+    case 'summary':
+    case 'more':
+    case 'others':
+      return hash;
+    default:
+      return 'today';
+  }
+}
+
 const PREFS_KEY = 'workout-apk:prefs';
 
 function loadPrefs(): UserPrefs | null {
@@ -46,18 +62,24 @@ function Shell() {
     // Once per sign-in. Later workouts and body logs sync themselves.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.uid]);
-  const [tab, setTab] = useState<Tab>('today');
+  const [route, setRoute] = useState(readRoute);
+  const tab = route === 'summary' ? 'progress' : route === 'others' ? 'more' : route;
   const todayScroll = useRef(0);
-  const navigate = (next: Tab) => {
-    if (next === tab) return;
-    if (tab === 'today') todayScroll.current = window.scrollY;
-    setTab(next);
+  const navigate = (next: Route) => {
+    if (next !== route) window.location.hash = next;
   };
   useEffect(() => {
-    window.scrollTo(0, tab === 'today' ? todayScroll.current : 0);
-  }, [tab]);
-  const [progressView, setProgressView] = useState<'progress' | 'summary'>('progress');
-  const [moreView, setMoreView] = useState<'settings' | 'others'>('settings');
+    const onHashChange = () => {
+      const next = readRoute();
+      if (route === 'today' && next !== 'today') todayScroll.current = window.scrollY;
+      setRoute(next);
+    };
+    window.addEventListener('hashchange', onHashChange);
+    return () => window.removeEventListener('hashchange', onHashChange);
+  }, [route]);
+  useEffect(() => {
+    window.scrollTo(0, route === 'today' ? todayScroll.current : 0);
+  }, [route]);
   const active = !!data.draft?.startedAt;
   const done = weekCount(data.sessions);
   const unlocked = done >= data.settings.summaryThreshold;
@@ -87,17 +109,17 @@ function Shell() {
         {tab === 'history' && <History data={data} />}
         {tab === 'progress' && <>
           <div className="view-switch">
-            <button className="chip" aria-pressed={progressView === 'progress'} onClick={() => setProgressView('progress')}>Progress</button>
-            <button className="chip" aria-pressed={progressView === 'summary'} onClick={() => setProgressView('summary')}>Weekly summary{!unlocked && ' 🔒'}</button>
+            <button className="chip" aria-pressed={route === 'progress'} onClick={() => navigate('progress')}>Progress</button>
+            <button className="chip" aria-pressed={route === 'summary'} onClick={() => navigate('summary')}>Weekly summary{!unlocked && ' 🔒'}</button>
           </div>
-          {progressView === 'summary' ? <Summary data={data} /> : <Progress data={data} setData={setData} />}
+          {route === 'summary' ? <Summary data={data} /> : <Progress data={data} setData={setData} />}
         </>}
         {tab === 'more' && <>
           <div className="view-switch">
-            <button className="chip" aria-pressed={moreView === 'settings'} onClick={() => setMoreView('settings')}>Settings</button>
-            <button className="chip" aria-pressed={moreView === 'others'} onClick={() => setMoreView('others')}>Others</button>
+            <button className="chip" aria-pressed={route === 'more'} onClick={() => navigate('more')}>Settings</button>
+            <button className="chip" aria-pressed={route === 'others'} onClick={() => navigate('others')}>Others</button>
           </div>
-          {moreView === 'others' ? <Others /> : <SettingsScreen data={data} setData={setData} />}
+          {route === 'others' ? <Others /> : <SettingsScreen data={data} setData={setData} />}
         </>}
       </main>
       {(!active || tab !== 'today') && <nav className="tabs" aria-label="Main navigation">
