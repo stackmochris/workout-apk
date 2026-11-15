@@ -47,6 +47,10 @@
   --console-dark: #101d15;
   --console-light: #f5f8ed;
   --console-muted: #bdcbbf;
+  --load-none: #c8cec5;
+  --load-low: #a6bc91;
+  --load-moderate: #719c43;
+  --load-high: #c8fa53;
   --console-paper: #f7f5ed;
   --console-lime: #c8fa53;
   --console-line: #586959;

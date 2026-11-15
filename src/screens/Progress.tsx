@@ -50,24 +50,9 @@ export default function Progress({ data, setData }: Props) {
       </div>
 
       <div className="card">
-        <h3>Muscle load</h3>
-        <p className="muted">Darker = worked harder recently. Fades as it recovers (about 36 h half-life, a rough guide).</p>
+        <h3>Recent training load</h3>
+        <p className="muted">Estimated from recent hard sets, weighted towards newer workouts.</p>
         <BodyMap load={fatigue} />
-      </div>
-
-      <div className="card ss-usage" aria-label="Superset usage this week">
-        <h3>Supersets</h3>
-        <p className="muted small">This week. Hard sets in a group shared by two or more movements.</p>
-        <div className="ss-stats">
-          <p>
-            <b>{supersets.supersets}</b>
-            <span>{supersets.supersets === 1 ? 'Superset' : 'Supersets'}</span>
-          </p>
-          <p>
-            <b>{supersets.sets}</b>
-            <span>{supersets.sets === 1 ? 'Superset set' : 'Superset sets'}</span>
-          </p>
-        </div>
       </div>
 
       <div className="card">
@@ -84,6 +69,21 @@ export default function Progress({ data, setData }: Props) {
               </div>
             );
           })}
+        </div>
+      </div>
+
+      <div className="card ss-usage" aria-label="Superset usage this week">
+        <h3>Supersets</h3>
+        <p className="muted small">This week. Hard sets in a group shared by two or more movements.</p>
+        <div className="ss-stats">
+          <p>
+            <b>{supersets.supersets}</b>
+            <span>{supersets.supersets === 1 ? 'Superset' : 'Supersets'}</span>
+          </p>
+          <p>
+            <b>{supersets.sets}</b>
+            <span>{supersets.sets === 1 ? 'Superset set' : 'Superset sets'}</span>
+          </p>
         </div>
       </div>
 

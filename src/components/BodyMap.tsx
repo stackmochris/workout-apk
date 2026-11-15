@@ -1,50 +1,77 @@
-import { Muscle } from '../data/muscles';
+import { MUSCLES, Muscle } from '../data/muscles';
 
-type Shape = [Muscle, string];
+type Region = readonly [Muscle, string];
+type Load = Partial<Record<Muscle, number>>;
 
-// Simple front and back outlines on a 100×200 grid. Each muscle is a few soft shapes.
-const ell = (cx: number, cy: number, rx: number, ry: number) => `M${cx - rx},${cy} a${rx},${ry} 0 1,0 ${2 * rx},0 a${rx},${ry} 0 1,0 ${-2 * rx},0`;
-const FRONT: Shape[] = [
-  ['chest', ell(40, 52, 9, 7) + ell(60, 52, 9, 7)],
-  ['frontDelts', ell(29, 44, 5, 5) + ell(71, 44, 5, 5)],
-  ['sideDelts', ell(25, 47, 3, 6) + ell(75, 47, 3, 6)],
-  ['biceps', ell(24, 66, 4, 9) + ell(76, 66, 4, 9)],
-  ['abs', 'M42,62 h16 v30 q-8,5 -16,0 z'],
-  ['quads', ell(41, 120, 7, 20) + ell(59, 120, 7, 20)],
-  ['calves', ell(40, 166, 4, 12) + ell(60, 166, 4, 12)],
+// Original simplified contours. Reference: OpenStax Anatomy & Physiology,
+// Figure 11.5 (Overview of the Muscular System). Each path is the left half
+// of a bilateral region, mirrored around the same centreline in both views.
+const FRONT: Region[] = [
+  ['sideDelts', 'M33 46 Q23 47 21 57 L20 63 Q24 62 27 57 Z'],
+  ['frontDelts', 'M34 46 Q29 48 24 59 L28 64 Q33 60 36 49 Z'],
+  ['chest', 'M37 49 Q43 50 49 48 L49 67 Q38 70 30 62 Q35 57 37 49 Z'],
+  ['biceps', 'M27 65 Q30 69 28 78 L24 89 Q21 88 20 85 L21 75 Q23 68 27 65 Z'],
+  ['abs', 'M49 70 Q45 70 41 69 Q40 79 42 90 L46 100 L49 102 Z'],
+  ['quads', 'M36 105 Q40 111 47 117 Q46 137 40 152 Q35 153 33 144 Q30 130 33 115 Z'],
+  ['calves', 'M33 159 Q30 163 31 174 L35 185 L35 168 Z'],
 ];
-const BACK: Shape[] = [
-  ['traps', 'M40,36 q10,-6 20,0 l4,12 q-14,6 -28,0 z'],
-  ['rearDelts', ell(28, 46, 5, 5) + ell(72, 46, 5, 5)],
-  ['upperBack', ell(50, 56, 12, 7)],
-  ['lats', 'M36,58 q-4,18 8,30 h12 q12,-12 8,-30 q-14,8 -28,0 z'],
-  ['triceps', ell(24, 66, 4, 9) + ell(76, 66, 4, 9)],
-  ['glutes', ell(42, 104, 8, 8) + ell(58, 104, 8, 8)],
-  ['hamstrings', ell(41, 128, 6, 16) + ell(59, 128, 6, 16)],
-  ['calves', ell(40, 164, 5, 12) + ell(60, 164, 5, 12)],
+const BACK: Region[] = [
+  ['traps', 'M49 39 Q44 39 43 35 Q41 43 34 46 Q42 50 46 57 L49 70 Z'],
+  ['sideDelts', 'M33 46 Q23 47 21 57 L20 63 Q24 62 27 57 Z'],
+  ['rearDelts', 'M34 47 Q30 50 25 60 L29 64 Q34 61 38 51 Z'],
+  ['upperBack', 'M39 51 Q45 55 47 65 L46 71 Q40 69 32 64 Z'],
+  ['lats', 'M31 66 Q38 69 46 74 Q44 87 48 99 Q41 97 37 87 Q35 75 31 66 Z'],
+  ['triceps', 'M27 65 Q32 70 27 82 L24 90 Q20 89 19 85 L21 72 Z'],
+  ['glutes', 'M48 102 Q41 101 36 97 Q32 103 33 112 Q35 119 42 118 Q48 117 49 111 Z'],
+  ['hamstrings', 'M33 115 Q38 122 47 119 Q45 137 40 151 Q36 154 33 147 Q30 131 33 115 Z'],
+  ['calves', 'M38 157 Q33 155 31 165 Q30 176 35 185 L37 189 Q41 182 43 170 Q44 161 41 158 Z'],
 ];
-const OUTLINE = 'M50,6 a9,10 0 1,1 -0.1,0 M38,32 q12,-6 24,0 q14,2 16,14 l4,42 q1,8 -4,8 l-4,-32 l-2,36 l2,40 l-2,50 h-8 l-4,-44 h-4 l-4,44 h-8 l-2,-50 l2,-40 l-2,-36 l-4,32 q-5,0 -4,-8 l4,-42 q2,-12 16,-14 z';
 
-/** Tint 0–1 → fill colour from neutral to the accent. */
-const tint = (v: number) => `color-mix(in srgb, #2f9e5d ${Math.round(Math.min(1, v) * 100)}%, #e8e8e8)`;
+const HALF = 'M50 8 C42 8 38 13 38 21 Q37 25 40 29 Q41 33 44 35 L43 40 Q40 43 32 45 Q23 46 20 55 Q17 62 17 71 L15 84 Q12 91 11 101 L8 114 Q5 118 6 125 Q7 131 10 131 L12 125 Q15 126 16 121 L16 114 Q22 103 24 94 L29 77 Q32 69 32 72 Q35 83 35 91 Q35 98 32 106 Q28 119 30 136 L32 151 Q30 160 30 171 L34 192 Q34 199 30 202 Q26 207 32 209 L40 209 Q44 208 42 202 L41 193 Q44 180 45 166 L44 155 Q49 132 48 119 L50 115 Z';
 
-function Figure({ shapes, load, label }: { shapes: Shape[]; load: Partial<Record<Muscle, number>>; label: string }) {
+const BANDS = ['None', 'Low', 'Moderate', 'High'] as const;
+function band(load: number) {
+  return load <= 0 ? 0 : load < 1 / 3 ? 1 : load < 2 / 3 ? 2 : 3;
+}
+
+function Figure({ regions, load, label }: { regions: Region[]; load: Load; label: string }) {
   return (
     <figure>
-      <svg viewBox="0 0 100 200" className="body">
-        <path d={OUTLINE} className="outline" />
-        {shapes.map(([m, d], i) => <path key={i} d={d} style={{ fill: tint(load[m] ?? 0) }}><title>{m}</title></path>)}
+      <svg viewBox="2 4 96 210" className="body" role="img" aria-label={`${label} view of recent training load`}>
+        <path d={HALF} className="body-outline" stroke="none" />
+        <path d={HALF} className="body-outline" stroke="none" transform="translate(100 0) scale(-1 1)" />
+        {regions.map(([muscle, path]) => (
+          <g key={muscle} data-load={band(load[muscle] ?? 0)} className="body-region">
+            <path d={path} />
+            <path d={path} transform="translate(100 0) scale(-1 1)" />
+          </g>
+        ))}
       </svg>
       <figcaption>{label}</figcaption>
     </figure>
   );
 }
 
-export default function BodyMap({ load }: { load: Partial<Record<Muscle, number>> }) {
+export default function BodyMap({ load }: { load: Load }) {
+  const leading = MUSCLES.map(({ id, label }) => ({ id, label, load: load[id] ?? 0 }))
+    .filter((muscle) => muscle.load > 0)
+    .sort((a, b) => b.load - a.load)
+    .slice(0, 3);
+
   return (
-    <div className="bodymap">
-      <Figure shapes={FRONT} load={load} label="Front" />
-      <Figure shapes={BACK} load={load} label="Back" />
-    </div>
+    <>
+      <div className="bodymap">
+        <Figure regions={FRONT} load={load} label="Front" />
+        <Figure regions={BACK} load={load} label="Back" />
+      </div>
+      <ul className="bodymap-legend" aria-label="Recent training load scale">
+        {BANDS.map((label, index) => <li key={label}><i data-load={index} aria-hidden="true" />{label}</li>)}
+      </ul>
+      {leading.length ? (
+        <ul className="bodymap-leaders" aria-label="Most-loaded muscles">
+          {leading.map((muscle) => <li key={muscle.id}><b>{muscle.label}</b><span>{BANDS[band(muscle.load)]}</span></li>)}
+        </ul>
+      ) : <p className="muted small">No recent hard sets to show.</p>}
+    </>
   );
 }
