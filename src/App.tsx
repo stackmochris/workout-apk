@@ -52,6 +52,36 @@ export default function App() {
 }
 
 function Shell() {
+  useEffect(() => {
+    let lock: WakeLockSentinel | undefined;
+    let requesting = false;
+    let disposed = false;
+    const updateWakeLock = async () => {
+      if (document.visibilityState !== 'visible') {
+        void lock?.release();
+        lock = undefined;
+        return;
+      }
+      if (!navigator.wakeLock || requesting || (lock && !lock.released)) return;
+      requesting = true;
+      try {
+        const next = await navigator.wakeLock.request('screen');
+        if (disposed || document.visibilityState !== 'visible') await next.release();
+        else lock = next;
+      } catch {
+        // The browser or power settings may disallow wake lock.
+      } finally {
+        requesting = false;
+      }
+    };
+    void updateWakeLock();
+    document.addEventListener('visibilitychange', updateWakeLock);
+    return () => {
+      disposed = true;
+      document.removeEventListener('visibilitychange', updateWakeLock);
+      void lock?.release();
+    };
+  }, []);
   const [data, setData] = useAppData();
   const { user } = useAuth();
   const [prefs, setPrefs] = useState<UserPrefs | null>(loadPrefs);

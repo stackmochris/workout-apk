@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { completeSession, currentPlan, preview, skipSession } from '../engine/rotation';
 import { DEFAULT_DAY, FLAG_INFO, SWAP_DEFAULTS } from '../data/movements';
 import { penalisedHint, penaltyState } from '../engine/week';
@@ -72,6 +72,15 @@ export default function Today({ data, setData, onHistory }: Props) {
   const [finish, setFinish] = useState<{ session: Session; stats: SessionStats } | null>(null);
   const [sheetPrompt, setSheetPrompt] = useState<string | null>(null);
   const [editing, setEditing] = useState<string | null>(null);
+  const workoutSection = useRef<HTMLElement>(null);
+  const nextInput = useRef<string | null>(null);
+  useLayoutEffect(() => {
+    if (!nextInput.current) return;
+    const input = workoutSection.current?.querySelector<HTMLInputElement>(nextInput.current);
+    nextInput.current = null;
+    input?.focus();
+    input?.select();
+  });
   const currentCard = useRef<HTMLElement>(null);
   const [collapsed, setCollapsed] = useState<Record<number, boolean>>({});
   const [checkin, setCheckin] = useState<{ weight: string; energy: number; elbow: 'ok' | 'sore'; fasted: boolean } | null>(null);
@@ -182,6 +191,18 @@ export default function Today({ data, setData, onHistory }: Props) {
     });
     const round = movement.superset ? memberIndexes(movements, mi) : [mi];
     const partner = round.find((i) => movements[i].sets[si] && !movements[i].sets[si].done);
+    if (logged) {
+      const next = round.flatMap((i) => {
+        const set = movements[i].sets.findIndex((entry) => !entry.done);
+        return set < 0 ? [] : [{ i, set }];
+      }).sort((a, b) => a.set - b.set)[0];
+      if (next) {
+        setCollapsed((state) => ({ ...state, [round[0]]: false }));
+        nextInput.current = `[data-set-row="${next.i}-${next.set}"] input`;
+      } else {
+        nextInput.current = '.mv.active .current-set input, .mv.active .gvt-start input, .mv.active .cardio-inputs input';
+      }
+    }
     const rest = logged && partner == null && data.settings.restSeconds > 0
       ? { endAt: Date.now() + data.settings.restSeconds * 1000, seconds: data.settings.restSeconds }
       : old.done && !updated.done ? undefined : data.draft?.rest;
@@ -323,22 +344,28 @@ export default function Today({ data, setData, onHistory }: Props) {
           </p>
         )}
         {flagged && mv!.flags.map((f) => <p key={f} className="flag">{'\u26a0'} {FLAG_INFO[f]?.reminder ?? f}</p>)}
+        {mv?.notes && <p className="muted small">{mv.notes}</p>}
         {lm.gvt ? (
           <div className="gvt-work">
             {blocks(lm.sets).length > 0 && (
               <p className="muted" style={{ margin: '4px 0 8px' }}>
-                {blocks(lm.sets).map(blockLabel).join(' · ')}
+                {doneSets(lm)}/{data.settings.gvt.sets} sets logged · {blocks(lm.sets).map(blockLabel).join(' · ')}
+                {doneSets(lm) < data.settings.gvt.sets && ` · Next set: ${doneSets(lm) + 1}`}
               </p>
             )}
-            <div className="gvt-start" style={{ marginBottom: 8 }}>
+            <div className="gvt-start" data-gvt-weight={mi} style={{ marginBottom: 8 }}>
               <NumInput kind="kg" label={`${lm.name} kg`} value={gvtKg[mi] ?? null}
                 placeholder={(() => { const p = previousFor(data.sessions, lm.movementId); const w = p ? [...p.sets].reverse().find((x) => x.done && x.weight != null)?.weight : undefined; return w != null ? String(w) : 'kg'; })()}
                 onChange={(n) => setGvtKg((k) => ({ ...k, [mi]: n }))} />
             </div>
             <GvtTimer key={`${mi}-${doneSets(lm)}`} {...data.settings.gvt} sound={data.settings.sound} vibrate={data.settings.vibrate}
               startAt={doneSets(lm)} weight={gvtKg[mi] ?? null}
-              onFinish={(reps) => { logGvt(mi, gvtKg[mi] ?? null, reps); setGvtKg((k) => ({ ...k, [mi]: null })); }}
-              onAdjust={(reps) => { logGvt(mi, gvtKg[mi] ?? null, reps); setGvtKg((k) => ({ ...k, [mi]: null })); }} />
+              onFinish={(reps, weight) => { logGvt(mi, weight, reps); setGvtKg((k) => ({ ...k, [mi]: null })); }}
+              onAdjust={(reps, weight) => {
+                nextInput.current = `[data-gvt-weight="${mi}"] input`;
+                logGvt(mi, weight, reps);
+                setGvtKg((k) => ({ ...k, [mi]: null }));
+              }} />
           </div>
         ) : isCardio(lm.name) ? (
           <div className="cardio-inputs" style={{ margin: '8px 0' }}>
@@ -373,7 +400,7 @@ export default function Today({ data, setData, onHistory }: Props) {
               const setLabel = mark?.(si);
               return (
                 <Fragment key={si}>
-                  <SetRow index={si} s={s} hint={p} label={setLabel} current={!s.done && lm.sets.findIndex((set) => !set.done) === si}
+                  <SetRow rowId={`${mi}-${si}`} index={si} s={s} hint={p} label={setLabel} current={!s.done && lm.sets.findIndex((set) => !set.done) === si}
                     onEdit={(patch) => updateSet(mi, si, patch)}
                     onKind={(k) => setKind(mi, si, k)}
                     onTick={() => updateSet(mi, si, s.done ? { done: false } : { done: true, reps: s.reps ?? p.reps ?? null, weight: s.weight ?? p.weight ?? null })} />
@@ -421,7 +448,7 @@ export default function Today({ data, setData, onHistory }: Props) {
     : current ? `Next: ${current.name}` : 'All exercises complete';
 
   return (
-    <section className={inSession ? 'workout-session' : 'workout-preview'}>
+    <section ref={workoutSection} className={inSession ? 'workout-session' : 'workout-preview'}>
       <header className={inSession ? 'session-heading' : `hero ${plan.type === 'GVT' ? 'gvt-day' : ''}`}>
         <small>{inSession ? 'Workout in progress' : onPlan ? 'Today' : 'Workout preview'}</small>
         <h1>{plan.focus === 'NoGym' ? 'No Gym' : plan.focus} <span>· {plan.type}</span></h1>

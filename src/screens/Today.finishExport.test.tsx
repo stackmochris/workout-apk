@@ -132,6 +132,13 @@ describe('finish workout sheet prompt', () => {
     });
   }
 
+  it('focuses the next set input after logging', async () => {
+    await renderToday();
+    await click(findButton((label) => label === 'Start workout'));
+    await click(document.querySelector<HTMLButtonElement>('[aria-label="Log set 1"]')!);
+    expect(document.activeElement?.getAttribute('aria-label')).toBe('Set 2 kg');
+  });
+
   it('offers optional export after the workout is saved', async () => {
     await renderToday();
     expect(exportDialog()).toBeNull();

@@ -61,6 +61,7 @@ const seeds: Record<Movement['focus'], Seed[]> = {
   Arm: [
     ['DB curls / hammer curls', 3, 10, 15, 'dumbbell', undefined, E],
     ['EZ bar curls', 3, 10, 12, 'barbell', undefined, E],
+    ['EZ bar curl 21s', 3, 21, 21, 'barbell', '7 lower-half reps, 7 upper-half reps, then 7 full-range reps.', E],
     ['Incline DB curl', 3, 10, 12, 'dumbbell', 'Arm hanging behind the body', E],
     ['Preacher curl', 3, 10, 12, 'machine', undefined, E],
     ['Bayesian cable curl', 3, 10, 12, 'cable', 'Arm behind body, stretch', E],

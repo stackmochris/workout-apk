@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { beep, buzz, wakeLock } from '../lib/audio';
+import { beep, buzz } from '../lib/audio';
 import { alerts } from '../lib/alerts';
 
 const R = 108;
@@ -12,9 +12,9 @@ const CIRC = 2 * Math.PI * R;
 export default function GvtTimer({ sets, reps, seconds, sound, vibrate, onFinish, onAdjust, startAt = 0, weight, autoStart = false }: {
   sets: number; reps: number; seconds: number; sound: boolean; vibrate: boolean;
   /** Called with the reps per set logged in this block once the last set ends. */
-  onFinish: (repsPerMinute: number[]) => void;
+  onFinish: (repsPerMinute: number[], blockWeight: number | null) => void;
   /** Adjust weight: hands back the sets completed so far at the current weight. */
-  onAdjust?: (repsPerMinute: number[]) => void;
+  onAdjust?: (repsPerMinute: number[], blockWeight: number | null) => void;
   /** Sets already logged for this movement (earlier weight blocks). */
   startAt?: number;
   weight?: number | null;
@@ -25,7 +25,7 @@ export default function GvtTimer({ sets, reps, seconds, sound, vibrate, onFinish
   const [set, setSet] = useState(0);
   const [left, setLeft] = useState(seconds);
   const [log, setLog] = useState<number[]>([]);
-  const release = useRef<() => void>(() => {});
+  const blockWeight = useRef<number | null>(null);
   const tone = (t: Parameters<typeof beep>[0]) => sound && beep(t);
 
   // Get-ready countdown
@@ -51,7 +51,6 @@ export default function GvtTimer({ sets, reps, seconds, sound, vibrate, onFinish
     return () => clearTimeout(id);
   }, [phase, left]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  useEffect(() => () => release.current(), []);
   useEffect(() => { if (autoStart) toggle(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   function startSet(n: number) {
@@ -67,17 +66,16 @@ export default function GvtTimer({ sets, reps, seconds, sound, vibrate, onFinish
     tone('done');
     if (vibrate) buzz([300, 100, 300]);
     alerts.finished('GVT', { sound: false, vibrate: false });
-    release.current();
   }
-  async function toggle() {
+  function toggle() {
     if (phase === 'idle' || phase === 'done') {
       setLog([]); setSet(startAt); setCount(5); setPhase('ready');
-      release.current = await wakeLock();
+      blockWeight.current = weight ?? null;
     } else if (phase === 'run') setPhase('paused');
     else if (phase === 'paused') setPhase('run');
   }
   function reset() {
-    setPhase('idle'); setSet(startAt); setLeft(seconds); setLog([]); release.current();
+    setPhase('idle'); setSet(startAt); setLeft(seconds); setLog([]);
   }
   function adjustReps(i: number, d: number) {
     setLog((g) => g.map((r, j) => (j === i ? Math.max(0, r + d) : r)));
@@ -101,13 +99,13 @@ export default function GvtTimer({ sets, reps, seconds, sound, vibrate, onFinish
           {phase === 'ready' ? count : phase === 'done' ? '✓' : left}
         </text>
         <text x="120" y="150" className="s">
-          {phase === 'idle' ? `${sets - startAt} × ${reps} @ ${seconds}s` : phase === 'ready' ? 'GET READY' : phase === 'done' ? `${total} reps${weight != null ? ` @ ${weight} kg` : ''}` : `SET ${set} / ${sets}`}
+          {phase === 'idle' ? `${sets - startAt} × ${reps} @ ${seconds}s` : phase === 'ready' ? 'GET READY' : phase === 'done' ? `${total} reps${blockWeight.current != null ? ` @ ${blockWeight.current} kg` : ''}` : `SET ${set} / ${sets}`}
         </text>
       </svg>
       <div className="row">
         {phase !== 'done' && <button className="primary" onClick={toggle}>{phase === 'run' ? 'Pause' : phase === 'paused' ? 'Resume' : 'Start'}</button>}
         <button className="ghost" onClick={reset}>Reset</button>
-        {onAdjust && phase !== 'done' && <button className="ghost" onClick={() => { release.current(); setPhase('idle'); onAdjust(log); }}>Adjust weight</button>}
+        {onAdjust && phase !== 'done' && <button className="ghost" onClick={() => { setPhase('idle'); onAdjust(log, blockWeight.current); }}>Adjust weight</button>}
       </div>
       {log.length > 0 && (
         <div className="replog">
@@ -120,7 +118,7 @@ export default function GvtTimer({ sets, reps, seconds, sound, vibrate, onFinish
           ))}
         </div>
       )}
-      {phase === 'done' && <button className="primary wide" onClick={() => onFinish(log)}>Log {log.length} sets{weight != null ? ` @ ${weight} kg` : ''}</button>}
+      {phase === 'done' && <button className="primary wide" onClick={() => onFinish(log, blockWeight.current)}>Log {log.length} sets{blockWeight.current != null ? ` @ ${blockWeight.current} kg` : ''}</button>}
     </div>
   );
 }

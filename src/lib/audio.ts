@@ -37,12 +37,3 @@ export function buzz(pattern: number | number[]) {
     /* unsupported */
   }
 }
-
-export async function wakeLock(): Promise<() => void> {
-  try {
-    const lock = await (navigator as any).wakeLock?.request('screen');
-    return () => lock?.release();
-  } catch {
-    return () => {};
-  }
-}
