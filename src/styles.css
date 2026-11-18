@@ -216,10 +216,12 @@ small, .muted { color: var(--muted); }
 .ss-actions .chip { min-height: 36px; padding: 0 10px; font-size: var(--fs-xs); }
 .setno.mark { font-size: 14px; letter-spacing: -.03em; padding: 0; }
 .card.superset .sets-h,
-.card.superset .set { grid-template-columns: 64px 1fr 1fr 56px; }
+.card.superset .set { grid-template-columns: 52px 1fr 1fr 52px 56px; }
+.card.superset .set.drop-row { grid-template-columns: 52px 1fr 1fr 1fr 52px 56px; }
 
 .sets { margin-top: 10px; display: grid; gap: 8px; }
-.sets-h, .set { display: grid; grid-template-columns: 52px 1fr 1fr 60px; gap: 8px; align-items: center; }
+.sets-h, .set { display: grid; grid-template-columns: 44px 1fr 1fr 52px 56px; gap: 8px; align-items: center; }
+.set.drop-row { grid-template-columns: 44px 1fr 1fr 1fr 52px 56px; }
 .sets-h { font-size: var(--fs-2xs); color: var(--muted); text-transform: uppercase; letter-spacing: .08em; font-weight: 650; }
 .set > span { text-align: center; color: var(--muted); }
 .set input {
@@ -436,6 +438,16 @@ small, .muted { color: var(--muted); }
   font-size: var(--fs-sm);
 }
 .banner strong { color: var(--gvt-ink); }
+.banner.warn {
+  border-color: color-mix(in srgb, var(--danger) 42%, white);
+  background: #fdecea;
+}
+.banner.warn strong { color: #9c341f; }
+.targets { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; margin-bottom: var(--s3); }
+.targets b { color: var(--active); font-variant-numeric: tabular-nums; }
+.elbow-scale { display: flex; flex-wrap: wrap; gap: 6px; }
+.elbow-scale .chip { min-width: 36px; padding: 0 8px; }
+.preview-list .suggest { margin: 2px 0 0; }
 .swap-card { text-align: center; }
 .swap-name { margin: 8px 0; }
 .swap-total { font-size: var(--fs-md); color: var(--muted); }
@@ -948,10 +960,10 @@ label.file input { position: absolute; inset: 0; opacity: 0; width: 100%; max-wi
   border-color: var(--console-dark);
 }
 .workout-session .sets-h, .workout-session .set {
-  grid-template-columns: minmax(36px, .65fr) minmax(0, 1.35fr) minmax(0, 1fr) minmax(48px, .85fr);
+  grid-template-columns: minmax(32px, .5fr) minmax(0, 1.15fr) minmax(0, .85fr) minmax(40px, .65fr) minmax(44px, .75fr);
 }
 .workout-session .set.drop-row {
-  grid-template-columns: minmax(34px, .7fr) repeat(3, minmax(0, 1fr)) minmax(48px, .85fr);
+  grid-template-columns: minmax(32px, .5fr) repeat(3, minmax(0, 1fr)) minmax(40px, .6fr) minmax(44px, .7fr);
 }
 .workout-session .set input { min-width: 0; padding-inline: var(--s1); }
 .workout-session .current-set input { font-size: var(--console-number-size); font-weight: 800; }

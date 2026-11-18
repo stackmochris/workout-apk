@@ -9,7 +9,9 @@ import { syncDisplayName } from '../lib/sync';
 import { BodyEntry, LoggedMovement, Movement, Session, SetKind, UserPrefs } from '../types';
 import RestTimer from '../components/RestTimer';
 import SetRow from '../components/SetRow';
-import { suggestNext, suggestDrop } from '../engine/progression';
+import { suggestNext, suggestDrop, loadStep } from '../engine/progression';
+import { cutDay, cutSlot, restFor } from '../data/cut';
+import { cutSessionOn, deloadPrompt, e1rmDropWarning, formatDailyTargets, nextCutSession, setsForSlot, weeklyLossWarning, WEEKDAY_LABELS, withDailyTargets } from '../engine/cut';
 import { plateLabel, plateLoad } from '../engine/plates';
 import { checkinFastedDefault, muscleFatigue, recoveryHint } from '../engine/analytics';
 import { MUSCLES } from '../data/muscles';
@@ -19,7 +21,7 @@ import SwapSession from '../components/SwapSession';
 import NumInput from '../components/NumInput';
 import { editSet } from '../engine/sets';
 import { blockLabel, blocks, doneSets, logBlock } from '../engine/gvt';
-import { FOCI, Focus, SessionType } from '../types';
+import { CutLetter, FOCI, Focus, SessionType } from '../types';
 import FinishExportPrompt from '../components/FinishExportPrompt';
 import FinishSheet from '../components/FinishSheet';
 import { computeSessionStats, SessionStats } from '../engine/sessionStats';
@@ -58,12 +60,33 @@ function blank(m: Movement): LoggedMovement {
 }
 
 export default function Today({ data, setData, onHistory }: Props) {
+  const cutMode = data.settings.programme === 'cut';
+  const today = new Date();
+  const autoCut = nextCutSession(today, data.settings.cutDays);
+  const [browseLetter, setBrowseLetter] = useState<CutLetter | null>(null);
+  const [elbowPain, setElbowPain] = useState<number | null>(null);
+  const [editTargets, setEditTargets] = useState(false);
+  const inProgressLetter = data.draft?.startedAt && data.draft.letter ? data.draft.letter as CutLetter : null;
+  const activeLetter: CutLetter = inProgressLetter ?? browseLetter ?? autoCut.letter;
+  const cutSessionToday = cutSessionOn(today, data.settings.cutDays) === activeLetter;
+  const dayPlan = cutDay(activeLetter);
+  const deload = cutMode ? deloadPrompt(data.sessions, today, data.settings.cutAnchor || undefined) : null;
+  const deloadOn = !!deload?.active;
+  const lossWarning = cutMode ? weeklyLossWarning(data.body) : null;
+  const liftWarning = cutMode ? e1rmDropWarning(data.sessions) : [];
+  const targets = formatDailyTargets(data.settings.targets);
   const planned = currentPlan(data.rotation);
   const [browse, setBrowse] = useState<{ focus: Focus; type: SessionType } | null>(null);
   const activeDraft = data.draft?.startedAt ? data.draft : null;
   const [receipt, setReceipt] = useState<{ session: Session; stats: SessionStats } | null>(null);
-  const plan = activeDraft ? { ...planned, focus: activeDraft.focus as Focus, type: activeDraft.type as SessionType } : browse ? { ...planned, ...browse } : planned;
-  const onPlan = plan.focus === planned.focus && plan.type === planned.type;
+  const plan = cutMode
+    ? { focus: dayPlan.focus, type: 'Normal' as SessionType, cycleStep: 1 }
+    : activeDraft
+      ? { ...planned, focus: activeDraft.focus as Focus, type: activeDraft.type as SessionType }
+      : browse
+        ? { ...planned, ...browse }
+        : planned;
+  const onPlan = cutMode ? activeLetter === autoCut.letter : plan.focus === planned.focus && plan.type === planned.type;
   const [gvtKg, setGvtKg] = useState<Record<number, number | null>>({});
   const byId = useMemo(() => new Map(data.movements.map((m) => [m.id, m])), [data.movements]);
   const [picker, setPicker] = useState<{ mode: 'add' | 'swap'; index?: number } | null>(null);
@@ -91,14 +114,19 @@ export default function Today({ data, setData, onHistory }: Props) {
     [data.sessions, data.settings.summaryThreshold, pen.stack],
   );
 
-  const draft =
-    data.draft && data.draft.focus === plan.focus && data.draft.type === plan.type
-      ? data.draft
-      : {
-          focus: plan.focus,
-          type: plan.type,
-          movements: (DEFAULT_DAY[plan.focus] ?? []).map((id) => byId.get(id)).filter(Boolean).map((m) => blank(m!)),
-        };
+  const draftMatches = cutMode
+    ? !!data.draft && (data.draft.startedAt ? data.draft.letter === activeLetter || !data.draft.letter : data.draft.letter === activeLetter)
+    : !!data.draft && data.draft.focus === plan.focus && data.draft.type === plan.type;
+  const freshMovements: LoggedMovement[] = cutMode
+    ? dayPlan.slots.map((slot) => ({
+        movementId: slot.id,
+        name: slot.name,
+        sets: Array.from({ length: setsForSlot(slot.id, deloadOn) }, () => ({ reps: null, weight: null, done: false })),
+      }))
+    : (DEFAULT_DAY[plan.focus] ?? []).map((id) => byId.get(id)).filter(Boolean).map((m) => blank(m!));
+  const draft: NonNullable<AppData['draft']> = draftMatches && data.draft
+    ? data.draft
+    : { focus: plan.focus, type: plan.type, letter: cutMode ? activeLetter : undefined, movements: freshMovements };
 
   const checkinWeek = new Date();
   checkinWeek.setDate(checkinWeek.getDate() - (checkinWeek.getDay() + 6) % 7);
@@ -118,7 +146,7 @@ export default function Today({ data, setData, onHistory }: Props) {
   const elapsedLabel = `${Math.floor(elapsed / 60)}:${String(elapsed % 60).padStart(2, '0')}`;
 
   const saveDraft = (movements: LoggedMovement[], extra: Partial<NonNullable<AppData['draft']>> = {}) =>
-    setData((d) => ({ ...d, draft: { ...draft, movements, lastInputAt: new Date().toISOString(), ...extra } }));
+    setData((d) => ({ ...d, draft: { ...draft, movements, letter: cutMode ? activeLetter : draft.letter, lastInputAt: new Date().toISOString(), ...extra } }));
   
   const setMovementNotes = (mi: number, notes: string) =>
     saveDraft(draft.movements.map((m, i) => i === mi ? { ...m, notes: notes || undefined } : m));
@@ -203,8 +231,10 @@ export default function Today({ data, setData, onHistory }: Props) {
         nextInput.current = '.mv.active .current-set input, .mv.active .gvt-start input, .mv.active .cardio-inputs input';
       }
     }
-    const rest = logged && partner == null && data.settings.restSeconds > 0
-      ? { endAt: Date.now() + data.settings.restSeconds * 1000, seconds: data.settings.restSeconds }
+    const role = cutSlot(movement.movementId)?.role;
+    const restSeconds = cutMode && role ? restFor(role).seconds : data.settings.restSeconds;
+    const rest = logged && partner == null && restSeconds > 0
+      ? { endAt: Date.now() + restSeconds * 1000, seconds: restSeconds }
       : old.done && !updated.done ? undefined : data.draft?.rest;
     saveDraft(movements, { startedAt: draft.startedAt ?? stamp, rest });
     if (logged && data.settings.vibrate) buzz(40);
@@ -241,16 +271,18 @@ export default function Today({ data, setData, onHistory }: Props) {
     const session: Session = {
       id: uid(), date: now, focus: plan.focus, type: plan.type, status,
       movements: status === 'completed' ? movementsToRecord(draft.movements.map((m) => ({ ...m, sets: m.sets.filter((set) => set.done) })), { keepAll: !!extra.gvtRepsPerMinute }) : [],
+      letter: cutMode ? activeLetter : undefined,
       author: 'app', updatedAt: now,
       durationMin: draft.startedAt ? Math.max(1, Math.round((Date.now() - new Date(draft.startedAt).getTime()) / 60000)) : undefined,
       ...extra,
     };
     if (status === 'skipped') {
-      if (!confirm(`Skip ${plan.focus}? The plan rolls forward to the next focus.`)) return;
+      if (!confirm(cutMode ? `Skip session ${activeLetter}?` : `Skip ${plan.focus}? The plan rolls forward to the next focus.`)) return;
       commitSession(session);
       return;
     }
     const stats = computeSessionStats(session, data.sessions, draft.startedAt);
+    setElbowPain(null);
     setFinish({ session, stats });
   };
 
@@ -259,7 +291,7 @@ export default function Today({ data, setData, onHistory }: Props) {
     setData((d) => ({
       ...d,
       sessions: [...d.sessions, session],
-      rotation: !onPlanNow ? d.rotation : session.status === 'completed' ? completeSession(d.rotation) : skipSession(d.rotation),
+      rotation: cutMode || !onPlanNow ? d.rotation : session.status === 'completed' ? completeSession(d.rotation) : skipSession(d.rotation),
       draft: null,
     }));
     setGvtKg({});
@@ -336,13 +368,16 @@ export default function Today({ data, setData, onHistory }: Props) {
           </div>
         )}
         <p className="muted small">{lastLabel(prev)}</p>
-        {sug.reason !== 'none' && (
+        {deloadOn ? (
+          <p className="suggest"><b>Deload</b><span>About half the sets, same weight</span></p>
+        ) : sug.reason !== 'none' && (
           <p className="suggest">
             <b>Suggested: {sugP.weight != null ? `${sugP.weight} kg \u00d7 ` : ''}{sugP.reps}</b>
-            <span>{sug.reason === 'add-weight' ? 'Top of range hit. Add weight' : sug.reason === 'add-reps' ? 'Add a rep' : 'Repeat'}{sugP.addedKg || sugP.addedReps ? ' (incl. penalty)' : ''}</span>
+            <span>{sug.reason === 'add-weight' ? `Top of the range at 1–2 RIR. Add ${mv ? loadStep(mv.equipment) : ''} kg` : sug.reason === 'add-reps' ? 'Add a rep' : 'Repeat'}{sugP.addedKg || sugP.addedReps ? ' (incl. penalty)' : ''}</span>
             {mv?.equipment === 'barbell' && sugP.weight != null && <span className="plates">{plateLabel(plateLoad(sugP.weight, data.settings.barKg, data.settings.plates))}</span>}
           </p>
         )}
+        {cutSlot(lm.movementId) && <p className="muted small">{restFor(cutSlot(lm.movementId)!.role).label}</p>}
         {flagged && mv!.flags.map((f) => <p key={f} className="flag">{'\u26a0'} {FLAG_INFO[f]?.reminder ?? f}</p>)}
         {mv?.notes && <p className="muted small">{mv.notes}</p>}
         {lm.gvt ? (
@@ -391,7 +426,7 @@ export default function Today({ data, setData, onHistory }: Props) {
           </div>
         ) : (
           <div className="sets">
-            <div className="sets-h"><span>Set</span><span>kg</span><span>Reps</span><span /></div>
+            <div className="sets-h"><span>Set</span><span>kg</span><span>Reps</span><span>RIR</span><span /></div>
             {lm.sets.map((s, si) => {
               const prevSet = prev?.sets[si];
               const base = (s.kind ?? 'working') !== 'working' || sug.reason === 'none' ? prevSet : { weight: sug.weight, reps: sug.reps };
@@ -450,14 +485,22 @@ export default function Today({ data, setData, onHistory }: Props) {
   return (
     <section ref={workoutSection} className={inSession ? 'workout-session' : 'workout-preview'}>
       <header className={inSession ? 'session-heading' : `hero ${plan.type === 'GVT' ? 'gvt-day' : ''}`}>
-        <small>{inSession ? 'Workout in progress' : onPlan ? 'Today' : 'Workout preview'}</small>
-        <h1>{plan.focus === 'NoGym' ? 'No Gym' : plan.focus} <span>· {plan.type}</span></h1>
-        <p className="nums">{inSession ? `${elapsedLabel} · ${doneCount}/${draft.movements.length} exercises` : `Cycle ${plan.cycleStep}/3 · ${draft.movements.length} exercises`}</p>
+        <small>{inSession ? 'Workout in progress' : cutMode || onPlan ? 'Today' : 'Workout preview'}</small>
+        <h1>{cutMode ? <>{activeLetter} <span>· {dayPlan.title}</span></> : <>{plan.focus === 'NoGym' ? 'No Gym' : plan.focus} <span>· {plan.type}</span></>}</h1>
+        <p className="nums">{inSession
+          ? `${elapsedLabel} · ${doneCount}/${draft.movements.length} exercises`
+          : cutMode
+            ? (cutSessionToday
+              ? `${WEEKDAY_LABELS[today.getDay()]} · ${draft.movements.length} exercises`
+              : onPlan
+                ? `Rest day · next is ${WEEKDAY_LABELS[autoCut.date.getDay()]}`
+                : `${WEEKDAY_LABELS[data.settings.cutDays[activeLetter]]} session`)
+            : `Cycle ${plan.cycleStep}/3 · ${draft.movements.length} exercises`}</p>
         {inSession && onHistory && <button className="ghost" onClick={onHistory}>History</button>}
       </header>
       {inSession && interrupted && <div className="card">
         <strong>Workout paused</strong>
-        <p>Your draft is saved. {onPlan ? 'Saving a partial workout advances your rotation.' : 'This workout leaves your rotation in place.'}</p>
+        <p>Your draft is saved. {cutMode ? 'Saving keeps this session.' : onPlan ? 'Saving a partial workout advances your rotation.' : 'This workout leaves your rotation in place.'}</p>
         <div className="row">
           <button className="primary" onClick={() => saveDraft(draft.movements)}>Resume workout</button>
           {hasLoggedWork
@@ -467,26 +510,112 @@ export default function Today({ data, setData, onHistory }: Props) {
       </div>}
       {inSession && <details className="session-plan">
         <summary>View upcoming plan</summary>
-        <p className="muted">{next.map((n) => `${n.focus} · ${n.type}`).join(' → ')}</p>
+        <p className="muted">{cutMode
+          ? (['A', 'B', 'C', 'D'] as CutLetter[]).map((letter) => `${letter} ${WEEKDAY_LABELS[data.settings.cutDays[letter]]}`).join(' → ')
+          : next.map((n) => `${n.focus} · ${n.type}`).join(' → ')}</p>
       </details>}
+      {cutMode && (
+        <div className="card targets">
+          <div>
+            <small className="muted">Daily targets</small>
+            <p><b>{targets.kcal}</b> kcal · <b>{targets.protein}</b> g protein</p>
+          </div>
+          <button className="ghost" type="button" onClick={() => setEditTargets((v) => !v)}>{editTargets ? 'Done' : 'Edit'}</button>
+        </div>
+      )}
+      {cutMode && editTargets && (
+        <div className="card form">
+          <label>Calories
+            <input inputMode="numeric" value={data.settings.targets.kcal} onChange={(e) => {
+              const kcal = Number(e.target.value);
+              if (Number.isFinite(kcal)) setData((d) => ({ ...d, settings: { ...d.settings, targets: withDailyTargets(d.settings.targets, { kcal }) } }));
+            }} />
+          </label>
+          <label>Protein (g)
+            <input inputMode="numeric" value={data.settings.targets.protein} onChange={(e) => {
+              const protein = Number(e.target.value);
+              if (Number.isFinite(protein)) setData((d) => ({ ...d, settings: { ...d.settings, targets: withDailyTargets(d.settings.targets, { protein }) } }));
+            }} />
+          </label>
+        </div>
+      )}
+      {lossWarning && (
+        <div className="banner warn" role="status">
+          <strong>Weight is dropping fast</strong>
+          <span>The fasted weekly average fell {lossWarning.losses[0]} kg, then {lossWarning.losses[1]} kg. That is more than about 1.2 kg a week, two weeks in a row. Eat more, or take a deload.</span>
+        </div>
+      )}
+      {liftWarning.length > 0 && (
+        <div className="banner warn" role="status">
+          <strong>{liftWarning.length === 1 ? `${liftWarning[0].name} is down ${Math.round(liftWarning[0].drop * 100)}%` : 'A main lift is down'}</strong>
+          <span>
+            {liftWarning.map((drop) => `${drop.name} estimated 1RM is ${drop.latest} kg, from a recent best of ${drop.best} kg (${Math.round(drop.drop * 100)}% down)`).join('. ')}.
+            {' '}Eat more, or deload.
+          </span>
+        </div>
+      )}
+      {deload?.active && (
+        <div className="banner" role="status">
+          <strong>Deload</strong>
+          <span>
+            {deload.scheduled ? `Week ${deload.week} is a deload week. ` : ''}
+            {deload.lifts.length > 0 ? `Reps fell two sessions in a row on ${deload.lifts.map((lift) => lift.name).join(', ')}. ` : ''}
+            Do about half the sets at the same weight.
+          </span>
+        </div>
+      )}
       {!inSession && (
         <div className="card plan">
-          <ul className="preview-list">{draft.movements.map((m, i) => <li key={i}>{m.name}</li>)}</ul>
+          {cutMode && (
+            <div className="chips" style={{ marginBottom: 12 }}>
+              {(['A', 'B', 'C', 'D'] as CutLetter[]).map((letter) => (
+                <button key={letter} type="button" className={`chip ${activeLetter === letter ? 'on' : ''}`}
+                  onClick={() => setBrowseLetter(letter === autoCut.letter ? null : letter)}>
+                  {letter} · {WEEKDAY_LABELS[data.settings.cutDays[letter]]}
+                </button>
+              ))}
+            </div>
+          )}
+          {cutMode && <p className="muted small">Neutral grips. Right elbow: skip heavy straight-bar curls, skull crushers, and wide-grip pressing.</p>}
+          <ul className="preview-list">{draft.movements.map((m, i) => {
+            const facts = movementFacts(m);
+            const slot = cutSlot(m.movementId);
+            const step = facts.mv ? loadStep(facts.mv.equipment) : 0;
+            return (
+              <li key={`${m.movementId}-${i}`}>
+                {m.name}
+                {slot && <p className="muted small">{restFor(slot.role).label} · {slot.sets} × {slot.repMin}–{slot.repMax}</p>}
+                {deloadOn && <p className="suggest"><b>Deload</b><span>About half the sets</span></p>}
+                {!deloadOn && facts.sug.reason === 'add-weight' && (
+                  <p className="suggest"><b>Suggested: {facts.sug.weight} kg × {facts.sug.reps}</b><span>Top of the range at 1–2 RIR. Add {step} kg</span></p>
+                )}
+                {!deloadOn && facts.sug.reason === 'add-reps' && (
+                  <p className="muted small">Next: {facts.sug.weight != null ? `${facts.sug.weight} kg × ` : ''}{facts.sug.reps} reps</p>
+                )}
+              </li>
+            );
+          })}</ul>
           <button className="primary wide" onClick={startTimer}>Start workout</button>
           {checkinDue && <button className="ghost wide" onClick={() => setCheckin({ weight: '', energy: 5, elbow: 'ok', fasted: checkinFastedDefault() })}>Weekly check-in</button>}
           <details>
             <summary>View plan</summary>
-            <label className="form">Preview a focus
-              <select value={plan.focus} onChange={(e) => {
-                const focus = e.target.value as Focus;
-                setBrowse(focus === planned.focus ? null : { focus, type: planned.type });
-              }}>
-                {FOCI.map((focus) => <option key={focus}>{focus}</option>)}
-              </select>
-            </label>
-            {!onPlan && <p className="muted small">This workout leaves your rotation in place.</p>}
-            <p className="next">Up next: {next.map((n) => `${n.focus} · ${n.type}`).join(' → ')}</p>
-            {onPlan && <button className="ghost" onClick={() => requestFinish('skipped')}>Skip {plan.focus} → next focus</button>}
+            {cutMode ? (
+              <p className="next">Days: {(['A', 'B', 'C', 'D'] as CutLetter[]).map((letter) => `${WEEKDAY_LABELS[data.settings.cutDays[letter]]} ${letter}`).join(' · ')}</p>
+            ) : (
+              <>
+                <label className="form">Preview a focus
+                  <select value={plan.focus} onChange={(e) => {
+                    const focus = e.target.value as Focus;
+                    setBrowse(focus === planned.focus ? null : { focus, type: planned.type });
+                  }}>
+                    {FOCI.map((focus) => <option key={focus}>{focus}</option>)}
+                  </select>
+                </label>
+                {!onPlan && <p className="muted small">This workout leaves your rotation in place.</p>}
+                <p className="next">Up next: {next.map((n) => `${n.focus} · ${n.type}`).join(' → ')}</p>
+              </>
+            )}
+            {onPlan && <button className="ghost" onClick={() => requestFinish('skipped')}>{cutMode ? `Skip ${activeLetter}` : `Skip ${plan.focus} → next focus`}</button>}
             <button className="ghost" onClick={() => { startTimer(); setSwapping(true); }}>Bodyweight workout</button>
           </details>
         </div>
@@ -669,10 +798,16 @@ export default function Today({ data, setData, onHistory }: Props) {
           <div className="sheet-body">
             <h3 id="finish-workout">Save workout?</h3>
             <p>{finish.session.movements.reduce((sum, m) => sum + m.sets.filter((set) => set.done).length, 0)} logged sets</p>
-            {current && <p className="muted">Some exercises are unfinished. {onPlan ? 'Saving advances your rotation.' : 'Your rotation stays in place.'}</p>}
+            {current && <p className="muted">Some exercises are unfinished. {cutMode ? 'Saving keeps this session.' : onPlan ? 'Saving advances your rotation.' : 'Your rotation stays in place.'}</p>}
+            <p className="muted" id="elbow-pain-label">Right elbow pain, 0–10</p>
+            <div className="elbow-scale" role="group" aria-labelledby="elbow-pain-label">
+              {Array.from({ length: 11 }, (_, n) => (
+                <button key={n} type="button" className={`chip ${elbowPain === n ? 'on' : ''}`} aria-pressed={elbowPain === n} onClick={() => setElbowPain(n)}>{n}</button>
+              ))}
+            </div>
             <div className="row">
               <button className="ghost" onClick={() => setFinish(null)}>Keep logging</button>
-              <button className="primary" onClick={() => commitSession(finish.session)}>Save workout</button>
+              <button className="primary" onClick={() => commitSession({ ...finish.session, elbowPain: elbowPain ?? undefined })}>Save workout</button>
             </div>
           </div>
         </div>
@@ -845,7 +980,7 @@ function lastLabel(prev: LoggedMovement | undefined) {
   if (!prev) return 'No previous session';
   const done = prev.sets.filter((x) => x.done);
   if (!done.length) return 'No previous session';
-  return `Last: ${done.map((x) => `${x.weight ?? '–'}×${x.reps ?? '–'}`).join(', ')}`;
+  return `Last: ${done.map((x) => `${x.weight ?? '–'}×${x.reps ?? '–'}${x.rir != null ? ` @${x.rir}` : ''}`).join(', ')}`;
 }
 
 function short(name: string) {

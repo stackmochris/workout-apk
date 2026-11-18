@@ -25,11 +25,11 @@ const RULES: [RegExp, Muscle[], Muscle[]][] = [
   [/row/i, ['upperBack', 'lats'], ['biceps', 'rearDelts']],
   [/pushdown|tricep/i, ['triceps'], []],
   [/curl/i, ['biceps'], []],
-  [/rdl/i, ['hamstrings', 'glutes'], ['upperBack']],
+  [/romanian|rdl/i, ['hamstrings', 'glutes'], ['upperBack']],
   [/leg curl/i, ['hamstrings'], []],
   [/leg extension/i, ['quads'], []],
   [/calf/i, ['calves'], []],
-  [/core|plank|leg raise/i, ['abs'], []],
+  [/core|plank|leg raise|crunch/i, ['abs'], []],
 ];
 
 const FOCUS_DEFAULT: Record<string, Muscle[]> = {
