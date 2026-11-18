@@ -13,6 +13,7 @@ const line = (cells: unknown[]) => cells.map(csvCell).join(',');
 export const SESSION_HEADERS = [
   'date', 'focus', 'type', 'status', 'swap', 'movement_id', 'movement', 'superset', 'set', 'kind', 'weight_kg', 'reps', 'done',
   'duration_min', 'session_notes', 'movement_notes', 'movement_duration_min', 'distance_km', 'effort', 'drop_start_kg', 'drop_end_kg',
+  'session_letter', 'elbow_pain', 'rir',
 ];
 
 export const BODY_HEADERS = [
@@ -46,6 +47,7 @@ function sessionCells(s: Session, m: LoggedMovement | null, setIndex: number | '
     setIndex, x ? (x.kind ?? 'working') : '', blank(x?.weight), blank(x?.reps), x ? (x.done ? 'yes' : 'no') : '',
     blank(s.durationMin), blank(s.notes), blank(m?.notes), blank(m?.durationMin), blank(distanceKm(s, m)), blank(s.effort),
     blank(x?.dropStart), blank(x?.dropEnd),
+    blank(s.letter), blank(s.elbowPain), blank(x?.rir),
   ];
 }
 

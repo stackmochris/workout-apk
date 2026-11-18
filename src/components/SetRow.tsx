@@ -38,6 +38,13 @@ export default function SetRow({ rowId, index, s, hint, onEdit, onTick, onKind, 
       )}
       <NumInput kind="reps" label={`Set ${mark} reps`} placeholder={hint.reps != null ? String(hint.reps) : 'reps'} value={s.reps}
         onChange={(n) => onEdit({ reps: n })} />
+      <input aria-label={`Set ${mark} RIR`} inputMode="numeric" placeholder="RIR" value={s.rir ?? ''}
+        onChange={(e) => {
+          const text = e.target.value.trim();
+          if (text === '') { onEdit({ rir: null }); return; }
+          const n = Number(text);
+          if (Number.isInteger(n) && n >= 0 && n <= 10) onEdit({ rir: n });
+        }} />
       <button aria-label={s.done ? `Undo logged set ${mark}` : `Log set ${mark}`}
         className={`tick ${s.done ? 'on' : ''}`} disabled={!s.done && s.reps == null && hint.reps == null} onClick={onTick}>
         {s.done ? '✓' : 'Log'}

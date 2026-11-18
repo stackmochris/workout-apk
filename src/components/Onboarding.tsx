@@ -6,11 +6,11 @@ interface Props {
   onComplete: (prefs: UserPrefs) => void;
 }
 
-const SPLITS: SplitType[] = ['per-muscle', 'push-pull-legs', 'upper-lower', 'mixed'];
+const SPLITS: SplitType[] = ['cut', 'per-muscle', 'push-pull-legs', 'upper-lower', 'mixed'];
 
 export default function Onboarding({ onComplete }: Props) {
   const [name, setName] = useState('');
-  const [split, setSplit] = useState<SplitType>('per-muscle');
+  const [split, setSplit] = useState<SplitType>('cut');
 
   const finish = () => {
     const prefs: UserPrefs = {
@@ -41,6 +41,7 @@ export default function Onboarding({ onComplete }: Props) {
       </div>
 
       <p className="muted small">
+        {split === 'cut' && 'Four days, A–D. Mon, Tue, Thu, Fri. Each session starts with a leg movement. Neutral grips for the right elbow.'}
         {split === 'per-muscle' && 'Classic 5-day focus rotation (Chest, Shoulder, Back, Arm, Leg).'}
         {split === 'push-pull-legs' && 'Push, Pull, and Legs days. Mix movements freely.'}
         {split === 'upper-lower' && 'Upper and Lower body days.'}

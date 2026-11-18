@@ -47,7 +47,15 @@ export function suggestNext(
     isFailure(s) && s.reps != null && (s.weight ?? 0) === (weight ?? 0) && s.reps >= top - 1
   );
 
-  const hitTop = minReps >= top || failureConfirms;
+  // Logged RIR: add load only when every working set at this weight was 1–2 RIR.
+  // Missing RIR keeps the older "top of the range" rule so existing logs still progress.
+  const rirs = atWeight.map((s) => s.rir).filter((rir): rir is number => rir != null);
+  const rirReady = rirs.length === atWeight.length && rirs.every((rir) => rir >= 1 && rir <= 2);
+  const rirBlocks = rirs.length > 0 && !rirReady;
+
+  // 1–2 RIR at the printed top of the range earns the next load, including elbow-flagged curls.
+  // Without RIR, elbow lifts still add the extra reps before the load goes up.
+  const hitTop = ((minReps >= top || failureConfirms) && !rirBlocks) || (rirReady && minReps >= mv.repMax);
 
   if (hitTop && weight != null) {
     const step = loadStep(mv.equipment);

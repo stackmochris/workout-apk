@@ -12,6 +12,7 @@ import Progress from './screens/Progress';
 import Summary, { weekCount } from './screens/Summary';
 import Others from './screens/Others';
 import Onboarding from './components/Onboarding';
+import { withProgramme } from './engine/cut';
 import { UserPrefs } from './types';
 
 type Tab = 'today' | 'history' | 'progress' | 'more';
@@ -117,6 +118,13 @@ function Shell() {
   const completeOnboarding = (p: UserPrefs) => {
     localStorage.setItem(PREFS_KEY, JSON.stringify(p));
     setPrefs(p);
+    setData((d) => ({
+      ...d,
+      settings: {
+        ...withProgramme(d.settings, p.split === 'cut' ? 'cut' : 'rotation'),
+        displayName: p.name?.trim() || d.settings.displayName,
+      },
+    }));
   };
 
   const themeClass = `theme-${data.settings.theme || 'green'}`;

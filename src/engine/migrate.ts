@@ -2,16 +2,17 @@ import { initialRotation } from './rotation';
 import { normalizeSupersetGroups } from './superset';
 import { DEFAULT_PENALTY } from './week';
 import { SEED_MOVEMENTS } from '../data/movements';
+import { CUT_ANCHOR, chooseProgramme, mergeTargets, normalizeCutDays } from './cut';
 import { BodyEntry, LoggedMovement, Movement, RotationState, Session, Settings, Theme } from '../types';
 
-export const DATA_VERSION = 2;
+export const DATA_VERSION = 3;
 
 export interface AppData {
-  version: 2;
+  version: 3;
   movements: Movement[];
   rotation: RotationState;
   sessions: Session[];
-  draft: { focus: string; type: string; movements: LoggedMovement[]; gvtRepsPerMinute?: number[]; startedAt?: string; lastInputAt?: string; rest?: { endAt: number; seconds: number } } | null;
+  draft: { focus: string; type: string; letter?: string; movements: LoggedMovement[]; gvtRepsPerMinute?: number[]; startedAt?: string; lastInputAt?: string; rest?: { endAt: number; seconds: number } } | null;
   settings: Settings;
   body: BodyEntry[];
 }
@@ -28,7 +29,10 @@ export const DEFAULT_SETTINGS: Settings = {
   muscleTarget: 10,
   supersetRest: 15,
   notifications: false,
-  targets: { proteinMin: 160, proteinMax: 180, kcalMin: 1950, kcalMax: 2200, waterGlasses: 8 },
+  targets: { proteinMin: 178, proteinMax: 178, kcalMin: 1780, kcalMax: 1780, protein: 178, kcal: 1780, waterGlasses: 8 },
+  programme: 'cut',
+  cutDays: { A: 1, B: 2, C: 4, D: 5 },
+  cutAnchor: CUT_ANCHOR,
   frequency: {
     enabled: true,
     threshold: 3,
@@ -48,7 +52,7 @@ export function normalizeTheme(theme: unknown): Theme {
 }
 
 export function freshData(): AppData {
-  return { version: 2, movements: SEED_MOVEMENTS, rotation: initialRotation(), sessions: [], draft: null, settings: DEFAULT_SETTINGS, body: [] };
+  return { version: 3, movements: SEED_MOVEMENTS, rotation: initialRotation(), sessions: [], draft: null, settings: DEFAULT_SETTINGS, body: [] };
 }
 
 export function migrate(raw: unknown): AppData {
@@ -57,10 +61,11 @@ export function migrate(raw: unknown): AppData {
   const d = raw as Partial<AppData> & { version?: number };
   const known = new Set((d.movements ?? []).map((m) => m.id));
   const movements = d.movements?.length ? [...d.movements, ...SEED_MOVEMENTS.filter((m) => !known.has(m.id))] : fresh.movements;
+  const programme = chooseProgramme(d);
   return {
     ...fresh,
     ...d,
-    version: 2,
+    version: 3,
     movements,
     rotation: d.rotation ?? fresh.rotation,
     sessions: Array.isArray(d.sessions)
@@ -74,13 +79,16 @@ export function migrate(raw: unknown): AppData {
       ...d.settings,
       penalty: { ...DEFAULT_PENALTY, ...d.settings?.penalty },
       gvt: { ...DEFAULT_SETTINGS.gvt, ...d.settings?.gvt },
-      targets: { ...DEFAULT_SETTINGS.targets, ...d.settings?.targets },
+      targets: mergeTargets(d.settings?.targets, programme),
       frequency: { ...DEFAULT_SETTINGS.frequency, ...d.settings?.frequency },
       theme: normalizeTheme(d.settings?.theme),
       displayName: d.settings?.displayName ?? '',
       goal: d.settings?.goal ?? 'mixed',
       cardioGoal: d.settings?.cardioGoal ?? 'maintenance',
       prescriptions: d.settings?.prescriptions ?? {},
+      programme,
+      cutDays: normalizeCutDays(d.settings?.cutDays),
+      cutAnchor: d.settings?.cutAnchor || (programme === 'cut' ? CUT_ANCHOR : ''),
     },
   };
 }

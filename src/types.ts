@@ -5,7 +5,11 @@ export const ROTATION_FOCI: Focus[] = ['Chest', 'Shoulder', 'Back', 'Arm', 'Leg'
 export type SessionType = 'Normal' | 'GVT';
 export type ActivityType = 'gym' | 'run' | 'walk' | 'hike' | 'calisthenics' | 'other';
 
-export type SplitType = 'per-muscle' | 'push-pull-legs' | 'upper-lower' | 'mixed';
+export type SplitType = 'per-muscle' | 'push-pull-legs' | 'upper-lower' | 'mixed' | 'cut';
+export type ProgrammeId = 'cut' | 'rotation';
+export type CutLetter = 'A' | 'B' | 'C' | 'D';
+/** Weekday for each cut session. 0 is Sunday, 1 is Monday. */
+export type CutSchedule = Record<CutLetter, number>;
 export type Theme = 'green' | 'red' | 'blue' | 'gold' | 'templar' | 'jerusalem' | 'union-jack' | 'confederate';
 export type Goal = 'strength' | 'hypertrophy' | 'endurance' | 'mixed';
 export type CardioGoal = 'maintenance' | 'calories' | 'pace' | 'distance' | 'time';
@@ -57,6 +61,8 @@ export interface SetEntry {
   dropStart?: number | null;
   /** Drop sets: finishing weight of the drop. */
   dropEnd?: number | null;
+  /** Reps in reserve, when the set was logged short of failure. */
+  rir?: number | null;
 }
 
 export interface LoggedMovement {
@@ -92,6 +98,10 @@ export interface Session {
   distanceKm?: number;
   effort?: number;
   notes?: string;
+  /** Cut session letter, when this workout came from the A–D programme. */
+  letter?: CutLetter;
+  /** Right-elbow pain for this session, 0–10. */
+  elbowPain?: number;
   author: 'app' | 'assistant';
   updatedAt: string;
 }
@@ -114,7 +124,23 @@ export interface Settings {
   muscleTarget: number;
   supersetRest: number;
   notifications: boolean;
-  targets: { proteinMin: number; proteinMax: number; kcalMin: number; kcalMax: number; waterGlasses: number };
+  targets: {
+    proteinMin: number;
+    proteinMax: number;
+    kcalMin: number;
+    kcalMax: number;
+    waterGlasses: number;
+    /** Daily protein target in grams. */
+    protein: number;
+    /** Daily calorie target. */
+    kcal: number;
+  };
+  /** Active programme. `cut` is the fat-loss A–D split. `rotation` is the 5-day focus cycle. */
+  programme: ProgrammeId;
+  /** Weekdays for sessions A–D. Ignored while `programme` is `rotation`. */
+  cutDays: CutSchedule;
+  /** YYYY-MM-DD. Week 1 of the cut contains this date. Empty until the cut is selected. */
+  cutAnchor: string;
   deload?: boolean;
   frequency: {
     enabled: boolean;

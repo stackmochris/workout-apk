@@ -9,7 +9,7 @@ function SessionCard({ s }: { s: Session }) {
   return (
     <article className={`card ${s.status === 'skipped' ? 'skipped' : s.type === 'GVT' ? 'gvt-day' : 'complete'}`}>
       <div className="mv-head">
-        <h3>{s.focus} · {s.swap ? 'Bodyweight swap' : s.type}</h3>
+        <h3>{s.letter ? `${s.letter} · ` : ''}{s.focus} · {s.swap ? 'Bodyweight swap' : s.type}</h3>
         <small>{new Date(s.date).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })}</small>
       </div>
       {s.status === 'skipped' ? <p className="muted">Skipped</p> : s.movements.map((m) => (
@@ -18,6 +18,7 @@ function SessionCard({ s }: { s: Session }) {
             : s.type === 'GVT' ? blocks(m.sets).map(blockLabel).join(', ')
             : m.sets.filter((x) => x.done).map((x) => `${x.kind && x.kind !== 'working' ? `${x.kind[0].toUpperCase()} ` : ''}${x.weight ?? '–'}×${x.reps ?? '–'}`).join('  '))}</span></p>
       ))}
+      {s.elbowPain != null && <p className="muted small">Elbow pain {s.elbowPain}/10</p>}
       {s.gvtRepsPerMinute && <p className="muted">GVT: {s.gvtRepsPerMinute.reduce((a, b) => a + b, 0)} reps over {s.gvtRepsPerMinute.length} min</p>}
     </article>
   );

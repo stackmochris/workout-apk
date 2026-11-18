@@ -23,11 +23,19 @@ const mixed: DayTemplate[] = [
   { id: 'mixed-b', name: 'Mixed B', movements: ['incline-db-press', 'lat-pulldown-paused-controlled', 'face-pull', 'barbell-rdl-db-rdl'] },
 ];
 
+const cut: DayTemplate[] = [
+  { id: 'cut-a', name: 'A · Chest + triceps', movements: ['cut-goblet-or-hack-squat', 'cut-neutral-incline-db-press', 'cut-flat-db-press', 'cut-cable-fly', 'cut-overhead-rope-triceps'] },
+  { id: 'cut-b', name: 'B · Back + biceps', movements: ['cut-romanian-deadlift', 'cut-neutral-lat-pulldown', 'cut-chest-supported-neutral-row', 'cut-seated-cable-row', 'cut-hammer-curl'] },
+  { id: 'cut-c', name: 'C · Shoulders + core', movements: ['cut-leg-press', 'cut-neutral-db-shoulder-press', 'cut-lateral-raise', 'cut-rear-delt-or-face-pull', 'cut-cable-crunch'] },
+  { id: 'cut-d', name: 'D · Upper mix', movements: ['cut-bulgarian-split-squat', 'cut-machine-chest-press', 'cut-assisted-neutral-pull-up', 'cut-incline-db-curl-neutral', 'cut-standing-calf-raise'] },
+];
+
 export const TEMPLATES: Record<SplitType, DayTemplate[]> = {
   'per-muscle': perMuscle,
   'push-pull-legs': pushPullLegs,
   'upper-lower': upperLower,
   mixed,
+  cut,
 };
 
 export const SPLIT_LABELS: Record<SplitType, string> = {
@@ -35,4 +43,5 @@ export const SPLIT_LABELS: Record<SplitType, string> = {
   'push-pull-legs': 'Push / Pull / Legs',
   'upper-lower': 'Upper / Lower',
   mixed: 'Mixed-group workouts',
+  cut: 'Fat-loss cut (A–D)',
 };

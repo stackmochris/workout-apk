@@ -84,8 +84,8 @@ describe('CSV export', () => {
     const csv = sessionsCsv([sess('2026-10-20T08:00:00.000Z', 'Chest', [{ movementId: 'b', name: 'Bench, flat', sets: [set(40, 5, 'warmup'), set(80, 8)] }])]);
     const lines = csv.trim().split('\n');
     expect(lines).toHaveLength(3);
-    expect(lines[0]).toBe('date,focus,type,status,swap,movement_id,movement,superset,set,kind,weight_kg,reps,done,duration_min,session_notes,movement_notes,movement_duration_min,distance_km,effort,drop_start_kg,drop_end_kg');
-    expect(lines[1]).toBe('2026-10-20T08:00:00.000Z,Chest,Normal,completed,,b,"Bench, flat",,1,warmup,40,5,yes,,,,,,,,');
+    expect(lines[0]).toBe('date,focus,type,status,swap,movement_id,movement,superset,set,kind,weight_kg,reps,done,duration_min,session_notes,movement_notes,movement_duration_min,distance_km,effort,drop_start_kg,drop_end_kg,session_letter,elbow_pain,rir');
+    expect(lines[1]).toBe('2026-10-20T08:00:00.000Z,Chest,Normal,completed,,b,"Bench, flat",,1,warmup,40,5,yes,,,,,,,,,,,');
     expect(lines[2]).toContain(',2,working,80,8,yes');
   });
   it('adds session and movement columns, including a cardio row with no sets', () => {
@@ -97,9 +97,9 @@ describe('CSV export', () => {
     ], { durationMin: 50, distanceKm: 9, effort: 7, notes: 'evening' })]);
     const lines = csv.trim().split('\n');
     expect(lines).toHaveLength(4);
-    expect(lines[1]).toBe('2026-10-21T18:00:00.000Z,HIIT,Normal,completed,,b,Bench,,1,drop,80,6,yes,50,evening,paused,15,9,7,100,60');
-    expect(lines[2]).toBe('2026-10-21T18:00:00.000Z,HIIT,Normal,completed,,run,Easy run,,,,,,,50,evening,park loop,32,5.2,7,,');
-    expect(lines[3]).toBe('2026-10-21T18:00:00.000Z,HIIT,Normal,completed,,mob,Mobility,,,,,,,50,evening,hips,,9,7,,');
+    expect(lines[1]).toBe('2026-10-21T18:00:00.000Z,HIIT,Normal,completed,,b,Bench,,1,drop,80,6,yes,50,evening,paused,15,9,7,100,60,,,');
+    expect(lines[2]).toBe('2026-10-21T18:00:00.000Z,HIIT,Normal,completed,,run,Easy run,,,,,,,50,evening,park loop,32,5.2,7,,,,,');
+    expect(lines[3]).toBe('2026-10-21T18:00:00.000Z,HIIT,Normal,completed,,mob,Mobility,,,,,,,50,evening,hips,,9,7,,,,,');
   });
   it('writes body stats sorted by date, with fasted as yes or empty', () => {
     const e = (date: string, extra: Partial<BodyEntry> = {}): BodyEntry => ({ id: date, date, author: 'app', updatedAt: date, ...extra });
@@ -152,7 +152,7 @@ describe('migration', () => {
   it('upgrades v1 data without losing sessions or settings', () => {
     const v1 = { version: 1, sessions: [sess('2026-10-01T00:00:00Z', 'Leg', [])], movements: SEED_MOVEMENTS.slice(0, 3), settings: { restSeconds: 120, penalty: { barbellKg: 5 } }, draft: null };
     const d = migrate(v1);
-    expect(d.version).toBe(2);
+    expect(d.version).toBe(3);
     expect(d.sessions).toHaveLength(1);
     expect(d.sessions[0].author).toBe('app');
     expect(d.sessions[0].updatedAt).toBe('2026-10-01T00:00:00Z');
@@ -180,7 +180,7 @@ describe('migration', () => {
   });
   it('import refuses non-backups', () => {
     expect(() => parseBackup('{"foo":1}')).toThrow();
-    expect(parseBackup('{"sessions":[]}').version).toBe(2);
+    expect(parseBackup('{"sessions":[]}').version).toBe(3);
   });
   it('prunes old snapshots, keeping the newest', () => {
     const keys = ['b:2026-10-01', 'b:2026-10-03', 'b:2026-10-02'];

@@ -1,4 +1,5 @@
 import { Movement } from '../types';
+import { CUT_MOVEMENTS } from './cut';
 
 /**
  * Seed movement library. Rep ranges are defaults; the displayed sub-heading is
@@ -155,7 +156,7 @@ const uniqueId = (name: string, focus: string) => {
   return id;
 };
 
-export const SEED_MOVEMENTS: Movement[] = Object.entries(seeds).flatMap(([focus, list]) =>
+const seeded: Movement[] = Object.entries(seeds).flatMap(([focus, list]) =>
   list.map(([name, sets, repMin, repMax, equipment, notes, elbow]) => ({
     id: uniqueId(name, focus),
     name,
@@ -169,6 +170,9 @@ export const SEED_MOVEMENTS: Movement[] = Object.entries(seeds).flatMap(([focus,
     equipment,
   })),
 );
+
+const seededIds = new Set(seeded.map((m) => m.id));
+export const SEED_MOVEMENTS: Movement[] = [...seeded, ...CUT_MOVEMENTS.filter((m) => !seededIds.has(m.id))];
 
 export const FLAG_INFO: Record<string, { label: string; reminder: string }> = {
   elbow: {

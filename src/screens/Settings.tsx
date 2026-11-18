@@ -7,6 +7,7 @@ import { useSyncPending } from '../lib/useSyncPending';
 import { listSnapshots, parseBackup, readSnapshot } from '../lib/backup';
 import { notificationsSupported, requestNotifications } from '../lib/alerts';
 import { plateLabel, plateLoad } from '../engine/plates';
+import { assignCutDay, CUT_LETTERS, WEEKDAY_LABELS, withDailyTargets, withProgramme } from '../engine/cut';
 import { Theme, Goal } from '../types';
 import type { CardioGoal } from '../types';
 
@@ -98,6 +99,36 @@ export default function SettingsScreen({ data, setData }: Props) {
         <p className="muted">Saved on this phone. When you are signed in, this is the name on Others Last.</p>
         <label>Name
           <input value={s.displayName ?? ''} onChange={(e) => set({ displayName: e.target.value })} placeholder="e.g. Chris" />
+        </label>
+      </div>
+      <div className="card form">
+        <h3>Programme</h3>
+        <p className="muted">The fat-loss cut is four days, A–D, with a leg movement first. The 5-day rotation is the older focus cycle. Switching does not delete logged sessions.</p>
+        <div className="chips">
+          <button type="button" className={`chip ${s.programme === 'cut' ? 'on' : ''}`} onClick={() => setData((d) => ({ ...d, settings: withProgramme(d.settings, 'cut') }))}>Fat-loss cut (A–D)</button>
+          <button type="button" className={`chip ${s.programme === 'rotation' ? 'on' : ''}`} onClick={() => setData((d) => ({ ...d, settings: withProgramme(d.settings, 'rotation') }))}>5-day focus rotation</button>
+        </div>
+        {s.programme === 'cut' && (
+          <>
+            <p className="muted small">Training days. Each letter keeps its own day.</p>
+            {CUT_LETTERS.map((letter) => (
+              <label key={letter}>{letter}
+                <select value={s.cutDays[letter]} onChange={(e) => set({ cutDays: assignCutDay(s.cutDays, letter, Number(e.target.value)) })}>
+                  {WEEKDAY_LABELS.map((label, weekday) => <option key={label} value={weekday}>{label}</option>)}
+                </select>
+              </label>
+            ))}
+          </>
+        )}
+      </div>
+      <div className="card form">
+        <h3>Daily targets</h3>
+        <p className="muted">Shown on Today. Protein is in grams.</p>
+        <label>Calories
+          <input inputMode="numeric" value={s.targets.kcal} onChange={(e) => set({ targets: withDailyTargets(s.targets, { kcal: num(e.target.value, s.targets.kcal) }) })} />
+        </label>
+        <label>Protein (g)
+          <input inputMode="numeric" value={s.targets.protein} onChange={(e) => set({ targets: withDailyTargets(s.targets, { protein: num(e.target.value, s.targets.protein) }) })} />
         </label>
       </div>
       <div className="card form">
