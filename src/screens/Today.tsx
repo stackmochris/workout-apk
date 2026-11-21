@@ -24,6 +24,7 @@ import { blockLabel, blocks, doneSets, logBlock } from '../engine/gvt';
 import { CutLetter, FOCI, Focus, SessionType } from '../types';
 import FinishExportPrompt from '../components/FinishExportPrompt';
 import FinishSheet from '../components/FinishSheet';
+import { offerSheetExport } from '../lib/finishExport';
 import { computeSessionStats, SessionStats } from '../engine/sessionStats';
 import { displayTarget } from '../engine/prescription';
 import { addLibraryMovement, memberIndexes, mergeMovement, moveBlock, movementsToRecord, removeGroup, removeMovement, setMark, supersetLetter, unlinkAll, unlinkMovement } from '../engine/superset';
@@ -94,6 +95,7 @@ export default function Today({ data, setData, onHistory }: Props) {
   const [swapping, setSwapping] = useState(false);
   const [finish, setFinish] = useState<{ session: Session; stats: SessionStats } | null>(null);
   const [sheetPrompt, setSheetPrompt] = useState<string | null>(null);
+  const exportSeen = useRef(new Set<string>());
   const [editing, setEditing] = useState<string | null>(null);
   const workoutSection = useRef<HTMLElement>(null);
   const nextInput = useRef<string | null>(null);
@@ -302,7 +304,10 @@ export default function Today({ data, setData, onHistory }: Props) {
     if (session.status === 'completed') {
       syncSession(session, syncDisplayName(data.settings.displayName, auth?.currentUser?.displayName, auth?.currentUser?.email));
     }
-    if (session.status === 'completed') setReceipt({ session, stats: computeSessionStats(session, data.sessions, draft.startedAt) });
+    if (session.status === 'completed') {
+      setReceipt({ session, stats: computeSessionStats(session, data.sessions, draft.startedAt) });
+      if (offerSheetExport(exportSeen.current, session)) setSheetPrompt(session.id);
+    }
   };
 
   const logGvt = (mi: number, weight: number | null, reps: number[]) => {

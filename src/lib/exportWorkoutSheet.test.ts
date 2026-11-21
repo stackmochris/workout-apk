@@ -169,6 +169,60 @@ describe('exportWorkoutSheet', () => {
     expect(local.get('chris')).toBe(CREATED_ID);
   });
 
+  it('retries an expired token once and updates the same sheet', async () => {
+    let pushes = 0;
+    const push = vi.fn(async (opts: Parameters<typeof pushWorkoutSheet>[0]) => {
+      pushes += 1;
+      if (pushes === 1) {
+        await opts.onId?.(CREATED_ID);
+        throw new SheetExportError('Google access expired. The sheet was not updated. Try the export again.', 401);
+      }
+      return { spreadsheetId: opts.spreadsheetId ?? 'other-sheet-id-000000', created: false };
+    });
+    const tokenFor = vi.fn(async (_user: User | null, opts?: { force?: boolean }) => ({
+      token: opts?.force ? 'fresh' : 'stale',
+      uid: 'chris',
+    }));
+    const { deps, local } = harness({ push, tokenFor });
+    const result = await exportWorkoutSheet(deps);
+    expect(tokenFor).toHaveBeenCalledTimes(2);
+    expect(tokenFor.mock.calls[1][1]).toEqual({ force: true });
+    expect(push.mock.calls[0][0].token).toBe('stale');
+    expect(push.mock.calls[1][0].token).toBe('fresh');
+    expect(push.mock.calls[1][0].spreadsheetId).toBe(CREATED_ID);
+    expect(result).toMatchObject({ ok: true, spreadsheetId: CREATED_ID, created: false });
+    expect(local.get('chris')).toBe(CREATED_ID);
+  });
+
+  it('tells the user when a fresh token is still rejected', async () => {
+    const push = vi.fn(async () => {
+      throw new SheetExportError('Google access expired. The sheet was not updated. Try the export again.', 401);
+    });
+    const tokenFor = vi.fn(async (_user: User | null, opts?: { force?: boolean }) => ({
+      token: opts?.force ? 'fresh' : 'stale',
+      uid: 'chris',
+    }));
+    const { deps } = harness({ push, tokenFor });
+    const result = await exportWorkoutSheet(deps);
+    expect(push).toHaveBeenCalledTimes(2);
+    expect(result).toEqual({
+      ok: false,
+      message: 'Google access expired. The sheet was not updated. Try the export again.',
+    });
+  });
+
+  it('does not ask Google again when the sheet itself cannot be edited', async () => {
+    const push = vi.fn(async () => {
+      throw new SheetExportError('This account cannot edit that Google Sheet. Paste a sheet you can edit, or forget the saved sheet. The sheet was not updated.', 403);
+    });
+    const { deps, tokenFor } = harness({ push });
+    const result = await exportWorkoutSheet(deps);
+    expect(tokenFor).toHaveBeenCalledTimes(1);
+    expect(push).toHaveBeenCalledTimes(1);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.message).toMatch(/not updated/);
+  });
+
   it('still reports success when the sheet wrote but the account copy did not', async () => {
     const writeRemote = vi.fn(async () => { throw new Error('firestore'); });
     const { deps } = harness({ writeRemote });

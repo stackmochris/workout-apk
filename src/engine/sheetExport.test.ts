@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { BodyEntry, Session } from '../types';
-import { BODY_HEADERS, SESSION_HEADERS } from './csv';
+import { BODY_HEADERS, SESSION_HEADERS, sessionRows } from './csv';
 import {
   SHEETS_SCOPE,
   SheetExportError,
@@ -65,7 +65,7 @@ describe('pushWorkoutSheet', () => {
       const method = init?.method ?? 'GET';
       const body = typeof init?.body === 'string' ? JSON.parse(init.body) : undefined;
       calls.push({ url, method, body, auth: String((init?.headers as Record<string, string>).Authorization) });
-      order.push(method === 'POST' && url.endsWith('/spreadsheets') ? 'create' : url.includes(':batchUpdate') ? 'write' : 'meta');
+      order.push(method === 'POST' && url.endsWith('/spreadsheets') ? 'create' : url.includes('values:batchGet') ? 'values' : url.includes(':batchUpdate') ? 'write' : 'meta');
       if (method === 'POST' && url.endsWith('/spreadsheets')) return json({ spreadsheetId: 'createdsheetid000000000001' });
       if (url.includes('fields=')) return json(tabs(['Sessions', 'Body']));
       return json({});
@@ -84,7 +84,7 @@ describe('pushWorkoutSheet', () => {
     });
     expect(first).toEqual({ spreadsheetId: 'createdsheetid000000000001', created: true });
     expect(saved).toBe('createdsheetid000000000001');
-    expect(order).toEqual(['create', 'save', 'meta', 'write']);
+    expect(order).toEqual(['create', 'save', 'meta', 'values', 'write']);
     expect(calls[0].body).toEqual(createSpreadsheetBody());
     expect(calls[0].body).toMatchObject({ properties: { title: 'Workout Export' } });
     expect(calls[0].auth).toBe('Bearer tok-1');
@@ -106,14 +106,15 @@ describe('pushWorkoutSheet', () => {
     expect(write).toHaveLength(2);
     const expected = replaceRequests({ sessions: 1, body: 2 }, sessions, body);
     for (const call of write) expect(call.body).toEqual({ requests: expected });
-    const sessionRows = expected[1].updateCells.rows ?? [];
-    const bodyRows = expected[3].updateCells.rows ?? [];
+    const sessionRows = expected[0].updateCells.rows ?? [];
+    const bodyRows = expected[1].updateCells.rows ?? [];
     expect(sessionRows[0].values.map((c) => c.userEnteredValue && 'stringValue' in c.userEnteredValue ? c.userEnteredValue.stringValue : '')).toEqual(SESSION_HEADERS);
     expect(bodyRows[0].values.map((c) => c.userEnteredValue && 'stringValue' in c.userEnteredValue ? c.userEnteredValue.stringValue : '')).toEqual(BODY_HEADERS);
     expect(bodyRows[1].values[1]).toEqual({ userEnteredValue: { numberValue: 90 } });
     expect(bodyRows[1].values[6]).toEqual({ userEnteredValue: { stringValue: 'yes' } });
-    expect(expected[0]).toEqual({ updateCells: { range: { sheetId: 1 }, fields: 'userEnteredValue' } });
-    expect(expected[1].updateCells.start).toEqual({ sheetId: 1, rowIndex: 0, columnIndex: 0 });
+    expect(JSON.stringify(expected)).not.toContain('"range"');
+    expect(expected[0].updateCells.start).toEqual({ sheetId: 1, rowIndex: 0, columnIndex: 0 });
+    expect(order).toEqual(['create', 'save', 'meta', 'values', 'write', 'meta', 'values', 'write']);
   });
 
   it('adds Sessions and Body when a pasted file does not have them', async () => {
@@ -180,6 +181,134 @@ describe('pushWorkoutSheet', () => {
     await expect(pushWorkoutSheet({
       token: '', spreadsheetId: null, sessions: [], body: [], fetchImpl, online: true,
     })).rejects.toThrow(/not updated/);
+  });
+
+  it('extends an old header in place and leaves every existing row', async () => {
+    const oldHeaders = SESSION_HEADERS.slice(0, SESSION_HEADERS.indexOf('session_letter'));
+    const kept = sess('2026-10-20T08:00:00.000Z');
+    kept.movements = [{ movementId: 'bench', name: 'Bench', sets: [{ weight: 80, reps: 8, done: true, kind: 'working' }] }];
+    const added = sess('2026-11-21T08:00:00.000Z');
+    added.letter = 'A';
+    added.elbowPain = 3;
+    added.movements = [{ movementId: 'press', name: 'Press', sets: [{ weight: 24, reps: 12, done: true, kind: 'working', rir: 2 }] }];
+    const keptRow = sessionRows([kept])[0].slice(0, oldHeaders.length);
+    const manual = oldHeaders.map((header) => {
+      if (header === 'date') return '2019-01-01T00:00:00.000Z';
+      if (header === 'movement_id') return 'note';
+      if (header === 'set') return 1;
+      return '';
+    });
+    const entry: BodyEntry = { id: 'b', date: '2026-10-20T08:00:00.000Z', weight: 90, fasted: true, author: 'app', updatedAt: '' };
+    const batches: { requests: { updateCells?: { start: { sheetId: number; rowIndex: number; columnIndex: number }; rows: { values: { userEnteredValue?: { stringValue?: string; numberValue?: number } }[] }[] }; updateSheetProperties?: { properties: { sheetId: number; gridProperties: { columnCount?: number } }; fields: string } }[] }[] = [];
+    const fetchImpl: typeof fetch = async (input, init) => {
+      const url = String(input);
+      const body = typeof init?.body === 'string' ? JSON.parse(init.body) : undefined;
+      if (url.includes('fields=')) {
+        return json({
+          sheets: [
+            { properties: { title: 'Sessions', sheetId: 1, gridProperties: { columnCount: oldHeaders.length, rowCount: 1000 } } },
+            { properties: { title: 'Body', sheetId: 2, gridProperties: { columnCount: 26, rowCount: 1000 } } },
+          ],
+        });
+      }
+      if (url.includes('values:batchGet')) {
+        return json({
+          valueRanges: [
+            { range: 'Sessions!A1:U3', values: [oldHeaders, keptRow, manual] },
+            { range: "'Body'!A1:I2", values: [BODY_HEADERS, [entry.date, entry.weight, '', '', '', '', 'yes', '', '']] },
+          ],
+        });
+      }
+      batches.push(body);
+      return json({});
+    };
+
+    const result = await pushWorkoutSheet({
+      token: 'tok',
+      spreadsheetId: EXAMPLE,
+      sessions: [kept, added],
+      body: [entry],
+      fetchImpl,
+      online: true,
+    });
+
+    expect(result).toEqual({ spreadsheetId: EXAMPLE, created: false });
+    expect(JSON.stringify(batches)).not.toContain('"range"');
+    expect(batches[0].requests).toEqual([{
+      updateSheetProperties: {
+        properties: { sheetId: 1, gridProperties: { columnCount: SESSION_HEADERS.length } },
+        fields: 'gridProperties.columnCount',
+      },
+    }]);
+    const writes = batches[1].requests.flatMap((request) => request.updateCells ? [request.updateCells] : []);
+    const text = (values: { userEnteredValue?: { stringValue?: string; numberValue?: number } }[] | undefined) =>
+      values?.map((value) => value.userEnteredValue?.stringValue ?? value.userEnteredValue?.numberValue ?? '');
+    const header = writes.find((request) => request.start.sheetId === 1 && request.start.rowIndex === 0);
+    expect(header?.start.columnIndex).toBe(oldHeaders.length);
+    expect(text(header?.rows[0].values)).toEqual(['session_letter', 'elbow_pain', 'rir']);
+    const patched = writes.find((request) => request.start.sheetId === 1 && request.start.rowIndex === 1);
+    expect(patched?.start.columnIndex).toBe(oldHeaders.length);
+    expect(text(patched?.rows[0].values)).toEqual(['', '', '']);
+    expect(writes.some((request) => request.start.sheetId === 1 && request.start.rowIndex === 2)).toBe(false);
+    const appended = writes.find((request) => request.start.sheetId === 1 && request.start.rowIndex === 3);
+    expect(appended?.start.columnIndex).toBe(0);
+    expect(text(appended?.rows[0].values)?.slice(-3)).toEqual(['A', 3, 2]);
+    const bodyWrite = writes.find((request) => request.start.sheetId === 2);
+    expect(bodyWrite?.start).toEqual({ sheetId: 2, rowIndex: 1, columnIndex: 0 });
+    expect(bodyWrite?.rows[0].values[1]).toEqual({ userEnteredValue: { numberValue: 90 } });
+  });
+
+  it('does not write when the header is not a Workout Export header', async () => {
+    const batches: unknown[] = [];
+    const fetchImpl: typeof fetch = async (input, init) => {
+      const url = String(input);
+      if (url.includes('fields=')) {
+        return json({
+          sheets: [
+            { properties: { title: 'Sessions', sheetId: 1, gridProperties: { columnCount: 26, rowCount: 100 } } },
+            { properties: { title: 'Body', sheetId: 2, gridProperties: { columnCount: 26, rowCount: 100 } } },
+          ],
+        });
+      }
+      if (url.includes('values:batchGet')) {
+        return json({
+          valueRanges: [
+            { range: 'Sessions', values: [['notes', 'only']] },
+            { range: 'Body', values: [BODY_HEADERS] },
+          ],
+        });
+      }
+      batches.push(init?.body);
+      return json({});
+    };
+    await expect(pushWorkoutSheet({
+      token: 'tok',
+      spreadsheetId: EXAMPLE,
+      sessions: [],
+      body: [],
+      fetchImpl,
+      online: true,
+    })).rejects.toThrow(/Nothing on it was changed/);
+    expect(batches).toEqual([]);
+  });
+
+  it('marks an expired token and a missing Sheets scope as retryable', async () => {
+    const expired: typeof fetch = async () => json({ error: { code: 401, message: 'Invalid Credentials' } }, 401);
+    const expiredError = await pushWorkoutSheet({
+      token: 'stale', spreadsheetId: EXAMPLE, sessions: [], body: [], fetchImpl: expired, online: true,
+    }).catch((error: unknown) => error);
+    expect(expiredError).toBeInstanceOf(SheetExportError);
+    expect(expiredError).toMatchObject({ status: 401, retryable: true });
+    expect((expiredError as SheetExportError).message).toMatch(/expired/);
+
+    const scope: typeof fetch = async () => json({
+      error: { code: 403, message: 'Request had insufficient authentication scopes.', errors: [{ reason: 'ACCESS_TOKEN_SCOPE_INSUFFICIENT' }] },
+    }, 403);
+    const scopeError = await pushWorkoutSheet({
+      token: 'narrow', spreadsheetId: EXAMPLE, sessions: [], body: [], fetchImpl: scope, online: true,
+    }).catch((error: unknown) => error);
+    expect(scopeError).toMatchObject({ status: 403, retryable: true });
+    expect((scopeError as SheetExportError).message).toMatch(/Sheets access/);
   });
 
   it('turns an HTTP refusal into a message that the sheet was not updated', () => {
