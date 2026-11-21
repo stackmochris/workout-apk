@@ -11,7 +11,7 @@ import RestTimer from '../components/RestTimer';
 import SetRow from '../components/SetRow';
 import { suggestNext, suggestDrop, loadStep } from '../engine/progression';
 import { cutDay, cutSlot, restFor } from '../data/cut';
-import { cutSessionOn, deloadPrompt, e1rmDropWarning, formatDailyTargets, nextCutSession, setsForSlot, weeklyLossWarning, WEEKDAY_LABELS, withDailyTargets } from '../engine/cut';
+import { cutSessionOn, deloadPrompt, e1rmDropWarning, formatDailyTargets, nextCutSession, setsForSlot, weeklyLossWarning, WEEKDAY_LABELS, withDailyTargets, withProgramme } from '../engine/cut';
 import { plateLabel, plateLoad } from '../engine/plates';
 import { checkinFastedDefault, muscleFatigue, recoveryHint } from '../engine/analytics';
 import { MUSCLES } from '../data/muscles';
@@ -21,14 +21,14 @@ import SwapSession from '../components/SwapSession';
 import NumInput from '../components/NumInput';
 import { editSet } from '../engine/sets';
 import { blockLabel, blocks, doneSets, logBlock } from '../engine/gvt';
-import { CutLetter, FOCI, Focus, SessionType } from '../types';
+import { CutLetter, FOCI, Focus, Goal, ProgrammeId, SessionType } from '../types';
 import FinishExportPrompt from '../components/FinishExportPrompt';
 import FinishSheet from '../components/FinishSheet';
 import { offerSheetExport } from '../lib/finishExport';
 import { computeSessionStats, SessionStats } from '../engine/sessionStats';
 import { displayTarget } from '../engine/prescription';
 import { addLibraryMovement, memberIndexes, mergeMovement, moveBlock, movementsToRecord, removeGroup, removeMovement, setMark, supersetLetter, unlinkAll, unlinkMovement } from '../engine/superset';
-import { Goal, Prescription } from '../types';
+import { Prescription } from '../types';
 
 
 const CARDIO = /zoned cardio|hike|walk|run|stairs|jump rope|cardio/i;
@@ -56,6 +56,29 @@ function kcalLabel(name: string, min: number | undefined, kg: number): string | 
 
 type Props = { data: AppData; setData: React.Dispatch<React.SetStateAction<AppData>>; prefs?: UserPrefs; onHistory?: () => void };
 
+const GOALS: { id: Goal; label: string }[] = [
+  { id: 'strength', label: 'Strength' },
+  { id: 'hypertrophy', label: 'Hypertrophy' },
+  { id: 'endurance', label: 'Endurance' },
+  { id: 'mixed', label: 'Mixed (use defaults)' },
+];
+
+const GOAL_BADGE: Record<Goal, string> = {
+  strength: 'Strength',
+  hypertrophy: 'Hypertrophy',
+  endurance: 'Endurance',
+  mixed: 'Mixed',
+};
+
+/** One-off Freestyle: empty list, no cut letter, and it does not touch the programme. */
+function isOneOffDraft(draft: { focus: string; letter?: string } | null | undefined): boolean {
+  return !!draft && draft.focus === 'Freestyle' && !draft.letter;
+}
+
+function movementLogged(movements: LoggedMovement[] | undefined): boolean {
+  return !!movements?.some((m) => m.sets.some((set) => set.done) || m.durationMin || m.distanceKm);
+}
+
 function blank(m: Movement): LoggedMovement {
   return { movementId: m.id, name: m.name, sets: Array.from({ length: m.sets || 3 }, () => ({ reps: null, weight: null, done: false })) };
 }
@@ -65,6 +88,8 @@ export default function Today({ data, setData, onHistory }: Props) {
   const today = new Date();
   const autoCut = nextCutSession(today, data.settings.cutDays);
   const [browseLetter, setBrowseLetter] = useState<CutLetter | null>(null);
+  const [freestyleToday, setFreestyleToday] = useState(() => isOneOffDraft(data.draft));
+  const [changeOpen, setChangeOpen] = useState(false);
   const [elbowPain, setElbowPain] = useState<number | null>(null);
   const [editTargets, setEditTargets] = useState(false);
   const inProgressLetter = data.draft?.startedAt && data.draft.letter ? data.draft.letter as CutLetter : null;
@@ -80,14 +105,19 @@ export default function Today({ data, setData, onHistory }: Props) {
   const [browse, setBrowse] = useState<{ focus: Focus; type: SessionType } | null>(null);
   const activeDraft = data.draft?.startedAt ? data.draft : null;
   const [receipt, setReceipt] = useState<{ session: Session; stats: SessionStats } | null>(null);
-  const plan = cutMode
-    ? { focus: dayPlan.focus, type: 'Normal' as SessionType, cycleStep: 1 }
-    : activeDraft
-      ? { ...planned, focus: activeDraft.focus as Focus, type: activeDraft.type as SessionType }
-      : browse
-        ? { ...planned, ...browse }
-        : planned;
-  const onPlan = cutMode ? activeLetter === autoCut.letter : plan.focus === planned.focus && plan.type === planned.type;
+  const plan = freestyleToday
+    ? { focus: 'Freestyle' as Focus, type: 'Normal' as SessionType, cycleStep: planned.cycleStep }
+    : cutMode
+      ? { focus: dayPlan.focus, type: 'Normal' as SessionType, cycleStep: 1 }
+      : activeDraft
+        ? { ...planned, focus: activeDraft.focus as Focus, type: activeDraft.type as SessionType }
+        : browse
+          ? { ...planned, ...browse }
+          : planned;
+  const onPlan = freestyleToday
+    ? false
+    : cutMode ? activeLetter === autoCut.letter : plan.focus === planned.focus && plan.type === planned.type;
+  const sessionLetter: CutLetter | undefined = freestyleToday || !cutMode ? undefined : activeLetter;
   const [gvtKg, setGvtKg] = useState<Record<number, number | null>>({});
   const byId = useMemo(() => new Map(data.movements.map((m) => [m.id, m])), [data.movements]);
   const [picker, setPicker] = useState<{ mode: 'add' | 'swap'; index?: number } | null>(null);
@@ -116,19 +146,26 @@ export default function Today({ data, setData, onHistory }: Props) {
     [data.sessions, data.settings.summaryThreshold, pen.stack],
   );
 
-  const draftMatches = cutMode
-    ? !!data.draft && (data.draft.startedAt ? data.draft.letter === activeLetter || !data.draft.letter : data.draft.letter === activeLetter)
-    : !!data.draft && data.draft.focus === plan.focus && data.draft.type === plan.type;
-  const freshMovements: LoggedMovement[] = cutMode
-    ? dayPlan.slots.map((slot) => ({
-        movementId: slot.id,
-        name: slot.name,
-        sets: Array.from({ length: setsForSlot(slot.id, deloadOn) }, () => ({ reps: null, weight: null, done: false })),
-      }))
-    : (DEFAULT_DAY[plan.focus] ?? []).map((id) => byId.get(id)).filter(Boolean).map((m) => blank(m!));
+  const oneOffDraft = isOneOffDraft(data.draft);
+  const draftMatches = freestyleToday
+    ? oneOffDraft
+    : oneOffDraft
+      ? false
+      : cutMode
+        ? !!data.draft && (data.draft.letter === activeLetter || (!!data.draft.startedAt && !data.draft.letter && data.draft.focus !== 'Freestyle'))
+        : !!data.draft && data.draft.focus === plan.focus && data.draft.type === plan.type;
+  const freshMovements: LoggedMovement[] = freestyleToday
+    ? []
+    : cutMode
+      ? dayPlan.slots.map((slot) => ({
+          movementId: slot.id,
+          name: slot.name,
+          sets: Array.from({ length: setsForSlot(slot.id, deloadOn) }, () => ({ reps: null, weight: null, done: false })),
+        }))
+      : (DEFAULT_DAY[plan.focus] ?? []).map((id) => byId.get(id)).filter(Boolean).map((m) => blank(m!));
   const draft: NonNullable<AppData['draft']> = draftMatches && data.draft
     ? data.draft
-    : { focus: plan.focus, type: plan.type, letter: cutMode ? activeLetter : undefined, movements: freshMovements };
+    : { focus: plan.focus, type: plan.type, letter: sessionLetter, movements: freshMovements };
 
   const checkinWeek = new Date();
   checkinWeek.setDate(checkinWeek.getDate() - (checkinWeek.getDay() + 6) % 7);
@@ -147,8 +184,10 @@ export default function Today({ data, setData, onHistory }: Props) {
     : 0;
   const elapsedLabel = `${Math.floor(elapsed / 60)}:${String(elapsed % 60).padStart(2, '0')}`;
 
-  const saveDraft = (movements: LoggedMovement[], extra: Partial<NonNullable<AppData['draft']>> = {}) =>
-    setData((d) => ({ ...d, draft: { ...draft, movements, letter: cutMode ? activeLetter : draft.letter, lastInputAt: new Date().toISOString(), ...extra } }));
+  const saveDraft = (movements: LoggedMovement[], extra: Partial<NonNullable<AppData['draft']>> = {}) => {
+    if (!draftMatches && movementLogged(data.draft?.movements) && !confirm('This replaces a draft that already has logged sets. Continue?')) return;
+    setData((d) => ({ ...d, draft: { ...draft, movements, letter: sessionLetter, lastInputAt: new Date().toISOString(), ...extra } }));
+  };
   
   const setMovementNotes = (mi: number, notes: string) =>
     saveDraft(draft.movements.map((m, i) => i === mi ? { ...m, notes: notes || undefined } : m));
@@ -273,7 +312,7 @@ export default function Today({ data, setData, onHistory }: Props) {
     const session: Session = {
       id: uid(), date: now, focus: plan.focus, type: plan.type, status,
       movements: status === 'completed' ? movementsToRecord(draft.movements.map((m) => ({ ...m, sets: m.sets.filter((set) => set.done) })), { keepAll: !!extra.gvtRepsPerMinute }) : [],
-      letter: cutMode ? activeLetter : undefined,
+      letter: sessionLetter,
       author: 'app', updatedAt: now,
       durationMin: draft.startedAt ? Math.max(1, Math.round((Date.now() - new Date(draft.startedAt).getTime()) / 60000)) : undefined,
       ...extra,
@@ -298,6 +337,8 @@ export default function Today({ data, setData, onHistory }: Props) {
     }));
     setGvtKg({});
     setBrowse(null);
+    setBrowseLetter(null);
+    setFreestyleToday(false);
     setCollapsed({});
     setSwapping(false);
     setFinish(null);
@@ -457,7 +498,7 @@ export default function Today({ data, setData, onHistory }: Props) {
   };
 
   const inSession = !!draft.startedAt;
-  const hasLoggedWork = draft.movements.some((m) => m.sets.some((set) => set.done) || m.durationMin || m.distanceKm);
+  const hasLoggedWork = movementLogged(draft.movements) || (!draftMatches && movementLogged(data.draft?.movements));
   const discardEmptyWorkout = () => {
     if (!confirm('Discard this workout draft?')) return;
     setData((d) => ({ ...d, draft: null }));
@@ -486,26 +527,96 @@ export default function Today({ data, setData, onHistory }: Props) {
   const nextLabel = swapping ? 'Bodyweight workout' : nextRound && partners.length > 1
     ? `Next: ${nextRound.mark} · ${draft.movements[nextRound.i].name}`
     : current ? `Next: ${current.name}` : 'All exercises complete';
+  const showChange = !inSession && !hasLoggedWork;
+
+  const allowSessionSwitch = () => {
+    if (!hasLoggedWork) return true;
+    return confirm('This draft has logged sets. Leave them and switch the session?');
+  };
+  const dropFreestyleDraft = () => {
+    setData((d) => (isOneOffDraft(d.draft) ? { ...d, draft: null } : d));
+  };
+  const startFreestyle = () => {
+    if (freestyleToday) {
+      setChangeOpen(false);
+      return;
+    }
+    if (!allowSessionSwitch()) return;
+    setBrowse(null);
+    setBrowseLetter(null);
+    setFreestyleToday(true);
+    setChangeOpen(false);
+  };
+  const backToPlan = () => {
+    if (!allowSessionSwitch()) return;
+    if (isOneOffDraft(data.draft)) dropFreestyleDraft();
+    setFreestyleToday(false);
+    setBrowse(null);
+    setBrowseLetter(null);
+    setChangeOpen(false);
+  };
+  const chooseLetter = (letter: CutLetter) => {
+    if ((freestyleToday || letter !== activeLetter) && !allowSessionSwitch()) return;
+    if (freestyleToday) dropFreestyleDraft();
+    setFreestyleToday(false);
+    setBrowseLetter(letter === autoCut.letter ? null : letter);
+  };
+  const chooseFocus = (focus: Focus) => {
+    if ((freestyleToday || focus !== plan.focus) && !allowSessionSwitch()) return;
+    if (freestyleToday) dropFreestyleDraft();
+    setFreestyleToday(false);
+    setBrowse(focus === planned.focus ? null : { focus, type: planned.type });
+  };
+  const chooseProgramme = (programme: ProgrammeId) => {
+    if (programme === data.settings.programme) return;
+    if (!allowSessionSwitch()) return;
+    setFreestyleToday(false);
+    setBrowse(null);
+    setBrowseLetter(null);
+    setData((d) => ({
+      ...d,
+      draft: freestyleToday && isOneOffDraft(d.draft) ? null : d.draft,
+      settings: withProgramme(d.settings, programme),
+    }));
+  };
+  const setGoal = (goal: Goal) => setData((d) => ({ ...d, settings: { ...d.settings, goal } }));
 
   return (
     <section ref={workoutSection} className={inSession ? 'workout-session' : 'workout-preview'}>
-      <header className={inSession ? 'session-heading' : `hero ${plan.type === 'GVT' ? 'gvt-day' : ''}`}>
-        <small>{inSession ? 'Workout in progress' : cutMode || onPlan ? 'Today' : 'Workout preview'}</small>
-        <h1>{cutMode ? <>{activeLetter} <span>· {dayPlan.title}</span></> : <>{plan.focus === 'NoGym' ? 'No Gym' : plan.focus} <span>· {plan.type}</span></>}</h1>
+      <header className={inSession ? 'session-heading' : `hero ${!freestyleToday && plan.type === 'GVT' ? 'gvt-day' : ''}`}>
+        <div className="hero-bar">
+          <small>{inSession ? 'Workout in progress' : freestyleToday ? 'One-off' : cutMode || onPlan ? 'Today' : 'Workout preview'}</small>
+          {showChange && (
+            <button type="button" className="ghost hero-change" aria-label="Change workout" onClick={() => setChangeOpen(true)}>Change</button>
+          )}
+        </div>
+        <h1>{freestyleToday
+          ? <>Freestyle <span>· add your own</span></>
+          : cutMode
+            ? <>{activeLetter} <span>· {dayPlan.title}</span></>
+            : <>{plan.focus === 'NoGym' ? 'No Gym' : plan.focus} <span>· {plan.type}</span></>}</h1>
         <p className="nums">{inSession
           ? `${elapsedLabel} · ${doneCount}/${draft.movements.length} exercises`
-          : cutMode
-            ? (cutSessionToday
-              ? `${WEEKDAY_LABELS[today.getDay()]} · ${draft.movements.length} exercises`
-              : onPlan
-                ? `Rest day · next is ${WEEKDAY_LABELS[autoCut.date.getDay()]}`
-                : `${WEEKDAY_LABELS[data.settings.cutDays[activeLetter]]} session`)
-            : `Cycle ${plan.cycleStep}/3 · ${draft.movements.length} exercises`}</p>
+          : freestyleToday
+            ? `Planned session stays ${cutMode ? activeLetter : planned.focus}`
+            : cutMode
+              ? (cutSessionToday
+                ? `${WEEKDAY_LABELS[today.getDay()]} · ${draft.movements.length} exercises`
+                : onPlan
+                  ? `Rest day · next is ${WEEKDAY_LABELS[autoCut.date.getDay()]}`
+                  : `${WEEKDAY_LABELS[data.settings.cutDays[activeLetter]]} session`)
+              : `Cycle ${plan.cycleStep}/3 · ${draft.movements.length} exercises`}</p>
+        <p className="pills"><span className="pill goal-badge">{GOAL_BADGE[data.settings.goal]}</span></p>
+        {freestyleToday && !hasLoggedWork && (
+          <div className="hero-actions">
+            <button type="button" className="ghost" onClick={backToPlan}>Back to planned session</button>
+          </div>
+        )}
         {inSession && onHistory && <button className="ghost" onClick={onHistory}>History</button>}
       </header>
       {inSession && interrupted && <div className="card">
         <strong>Workout paused</strong>
-        <p>Your draft is saved. {cutMode ? 'Saving keeps this session.' : onPlan ? 'Saving a partial workout advances your rotation.' : 'This workout leaves your rotation in place.'}</p>
+        <p>Your draft is saved. {freestyleToday ? 'Saving keeps this one-off. Your planned session stays put.' : cutMode ? 'Saving keeps this session.' : onPlan ? 'Saving a partial workout advances your rotation.' : 'This workout leaves your rotation in place.'}</p>
         <div className="row">
           <button className="primary" onClick={() => saveDraft(draft.movements)}>Resume workout</button>
           {hasLoggedWork
@@ -574,8 +685,8 @@ export default function Today({ data, setData, onHistory }: Props) {
           {cutMode && (
             <div className="chips" style={{ marginBottom: 12 }}>
               {(['A', 'B', 'C', 'D'] as CutLetter[]).map((letter) => (
-                <button key={letter} type="button" className={`chip ${activeLetter === letter ? 'on' : ''}`}
-                  onClick={() => setBrowseLetter(letter === autoCut.letter ? null : letter)}>
+                <button key={letter} type="button" className={`chip ${!freestyleToday && activeLetter === letter ? 'on' : ''}`}
+                  onClick={() => chooseLetter(letter)}>
                   {letter} · {WEEKDAY_LABELS[data.settings.cutDays[letter]]}
                 </button>
               ))}
@@ -600,6 +711,9 @@ export default function Today({ data, setData, onHistory }: Props) {
               </li>
             );
           })}</ul>
+          {freestyleToday && draft.movements.length === 0 && (
+            <p className="muted">No movements yet. Start, then add what you want to do.</p>
+          )}
           <button className="primary wide" onClick={startTimer}>Start workout</button>
           {checkinDue && <button className="ghost wide" onClick={() => setCheckin({ weight: '', energy: 5, elbow: 'ok', fasted: checkinFastedDefault() })}>Weekly check-in</button>}
           <details>
@@ -609,10 +723,7 @@ export default function Today({ data, setData, onHistory }: Props) {
             ) : (
               <>
                 <label className="form">Preview a focus
-                  <select value={plan.focus} onChange={(e) => {
-                    const focus = e.target.value as Focus;
-                    setBrowse(focus === planned.focus ? null : { focus, type: planned.type });
-                  }}>
+                  <select value={plan.focus} onChange={(e) => chooseFocus(e.target.value as Focus)}>
                     {FOCI.map((focus) => <option key={focus}>{focus}</option>)}
                   </select>
                 </label>
@@ -788,6 +899,52 @@ export default function Today({ data, setData, onHistory }: Props) {
         </div>
       )}
 
+      {changeOpen && (
+        <div className="sheet" role="dialog" aria-modal="true" aria-labelledby="change-workout-title" onClick={() => setChangeOpen(false)}>
+          <div className="sheet-body" onClick={(e) => e.stopPropagation()}>
+            <h3 id="change-workout-title">Change workout</h3>
+            <button type="button" className="primary wide" onClick={startFreestyle}>Freestyle today</button>
+            <p className="muted small">One-off. Your programme, rotation, and A–D days stay as they are.</p>
+            {freestyleToday && (
+              <button type="button" className="ghost wide" onClick={backToPlan}>Back to planned session</button>
+            )}
+            <h4>{cutMode ? 'Session' : 'Focus'}</h4>
+            <div className="chips" role="group" aria-label={cutMode ? 'Session' : 'Focus'}>
+              {cutMode
+                ? (['A', 'B', 'C', 'D'] as CutLetter[]).map((letter) => (
+                  <button key={letter} type="button" className={`chip ${!freestyleToday && activeLetter === letter ? 'on' : ''}`}
+                    aria-pressed={!freestyleToday && activeLetter === letter} onClick={() => chooseLetter(letter)}>
+                    {letter} · {WEEKDAY_LABELS[data.settings.cutDays[letter]]}
+                  </button>
+                ))
+                : FOCI.map((focus) => (
+                  <button key={focus} type="button" className={`chip ${!freestyleToday && plan.focus === focus ? 'on' : ''}`}
+                    aria-pressed={!freestyleToday && plan.focus === focus} onClick={() => chooseFocus(focus)}>
+                    {focus === 'NoGym' ? 'No Gym' : focus}
+                  </button>
+                ))}
+            </div>
+            <h4>Training goal</h4>
+            <div className="chips" role="group" aria-label="Training goal">
+              {GOALS.map((g) => (
+                <button key={g.id} type="button" className={`chip ${data.settings.goal === g.id ? 'on' : ''}`}
+                  aria-pressed={data.settings.goal === g.id} onClick={() => setGoal(g.id)}>
+                  {g.label}
+                </button>
+              ))}
+            </div>
+            <h4>Programme</h4>
+            <div className="chips" role="group" aria-label="Programme">
+              <button type="button" className={`chip ${data.settings.programme === 'cut' ? 'on' : ''}`}
+                aria-pressed={data.settings.programme === 'cut'} onClick={() => chooseProgramme('cut')}>Fat-loss cut (A–D)</button>
+              <button type="button" className={`chip ${data.settings.programme === 'rotation' ? 'on' : ''}`}
+                aria-pressed={data.settings.programme === 'rotation'} onClick={() => chooseProgramme('rotation')}>5-day focus rotation</button>
+            </div>
+            <button type="button" className="primary" onClick={() => setChangeOpen(false)}>Done</button>
+          </div>
+        </div>
+      )}
+
       {picker && (
         <div className="sheet" onClick={() => setPicker(null)}>
           <div className="sheet-body" onClick={(e) => e.stopPropagation()}>
@@ -803,7 +960,7 @@ export default function Today({ data, setData, onHistory }: Props) {
           <div className="sheet-body">
             <h3 id="finish-workout">Save workout?</h3>
             <p>{finish.session.movements.reduce((sum, m) => sum + m.sets.filter((set) => set.done).length, 0)} logged sets</p>
-            {current && <p className="muted">Some exercises are unfinished. {cutMode ? 'Saving keeps this session.' : onPlan ? 'Saving advances your rotation.' : 'Your rotation stays in place.'}</p>}
+            {current && <p className="muted">Some exercises are unfinished. {freestyleToday ? 'Saving keeps this one-off. Your planned session stays put.' : cutMode ? 'Saving keeps this session.' : onPlan ? 'Saving advances your rotation.' : 'Your rotation stays in place.'}</p>}
             <p className="muted" id="elbow-pain-label">Right elbow pain, 0–10</p>
             <div className="elbow-scale" role="group" aria-labelledby="elbow-pain-label">
               {Array.from({ length: 11 }, (_, n) => (
@@ -946,7 +1103,8 @@ function SupersetPicker({ anchorIndex, movements, library, focus, onJoinExisting
 
 function Picker({ movements, focus, onPick, original }: { movements: Movement[]; focus: string; onPick: (m: Movement) => void; original?: Movement }) {
   const cats = ['Chest', 'Shoulder', 'Back', 'Arm', 'Leg', 'HIIT', 'Crossfit', 'NoGym', 'Conditioning'];
-  const [cat, setCat] = useState<string>(original?.focus ?? focus);
+  const initialCat = original?.focus ?? focus;
+  const [cat, setCat] = useState<string>(initialCat === 'Freestyle' ? 'All' : initialCat);
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState('');
   const similarity = (m: Movement) => Number(!!original?.target && m.target === original.target) * 2
