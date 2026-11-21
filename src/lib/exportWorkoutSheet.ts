@@ -1,12 +1,13 @@
 import type { User } from 'firebase/auth';
 import {
+  SheetExportError,
   parseSpreadsheetId,
   pushWorkoutSheet,
   sheetErrorMessage,
   spreadsheetUrl,
 } from '../engine/sheetExport';
 import type { BodyEntry, Session } from '../types';
-import { googleSheetsAccessToken } from './googleAccess';
+import { clearGoogleSheetsAccess, googleSheetsAccessToken } from './googleAccess';
 import { readExportSheetId, writeExportSheetId } from './sheetCloud';
 import { readLocalSheetId, writeLocalSheetId } from './sheetId';
 
@@ -48,7 +49,7 @@ export type ExportWorkoutSheetDeps = {
   pasted?: string;
   online?: boolean;
   onSpreadsheetId?: (id: string) => void;
-  tokenFor?: (user: User | null) => Promise<{ token: string; uid: string }>;
+  tokenFor?: (user: User | null, opts?: { force?: boolean }) => Promise<{ token: string; uid: string }>;
   readLocal?: (uid: string) => string | null;
   writeLocal?: (uid: string, id: string) => void;
   readRemote?: (uid: string) => Promise<string | null>;
@@ -75,8 +76,7 @@ export async function exportWorkoutSheet(deps: ExportWorkoutSheetDeps): Promise<
   const writeRemote = deps.writeRemote ?? writeExportSheetId;
   const push = deps.push ?? pushWorkoutSheet;
 
-  try {
-    const access = await tokenFor(deps.user);
+  const attempt = async (access: { token: string; uid: string }): Promise<WorkoutSheetExportResult> => {
     let id = pastedId ?? readLocal(access.uid);
     if (!id) {
       try {
@@ -100,6 +100,7 @@ export async function exportWorkoutSheet(deps: ExportWorkoutSheetDeps): Promise<
       body: deps.body,
       online,
       onId: async (createdId) => {
+        id = createdId;
         writeLocal(access.uid, createdId);
         deps.onSpreadsheetId?.(createdId);
         try { await writeRemote(access.uid, createdId); } catch { /* device copy still blocks a second spreadsheet */ }
@@ -122,6 +123,23 @@ export async function exportWorkoutSheet(deps: ExportWorkoutSheetDeps): Promise<
       created: result.created,
       synced,
     };
+  };
+
+  try {
+    const access = await tokenFor(deps.user);
+    try {
+      return await attempt(access);
+    } catch (error) {
+      if (!(error instanceof SheetExportError) || !error.retryable) throw error;
+      clearGoogleSheetsAccess();
+      const fresh = await tokenFor(deps.user, { force: true });
+      try {
+        return await attempt(fresh);
+      } catch (retryError) {
+        if (retryError instanceof SheetExportError && retryError.retryable) clearGoogleSheetsAccess();
+        throw retryError;
+      }
+    }
   } catch (error) {
     return { ok: false, message: sheetErrorMessage(error) };
   }

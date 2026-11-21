@@ -70,10 +70,11 @@ export default function FinishExportPrompt({
         )}
         {phase === 'result' && result && (
           <>
-            <p className="muted" role="status">{result.message}</p>
+            <p className={result.ok ? 'muted' : 'banner warn'} role={result.ok ? 'status' : 'alert'}>{result.message}</p>
             {result.ok && (
               <p><a className="sheet-link" href={result.url} target="_blank" rel="noopener noreferrer">Open in Google Sheets</a></p>
             )}
+            {!result.ok && <p className="muted small">This workout stays saved. Try the export again when you are ready.</p>}
           </>
         )}
         {phase === 'ask' && (

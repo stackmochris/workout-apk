@@ -28,6 +28,7 @@ export default function SheetExport({ data }: Props) {
   const [spreadsheetId, setSpreadsheetId] = useState<string | null>(null);
   const [paste, setPaste] = useState('');
   const [msg, setMsg] = useState('');
+  const [failed, setFailed] = useState(false);
   const [busy, setBusy] = useState(false);
   const uid = user?.uid;
 
@@ -50,16 +51,19 @@ export default function SheetExport({ data }: Props) {
   const savePasted = async () => {
     const id = parseSpreadsheetId(paste);
     if (!id) {
+      setFailed(true);
       setMsg('Paste a Google Sheet link or the spreadsheet id.');
       return;
     }
     if (!uid) {
+      setFailed(true);
       setMsg('Continue with Google first so this sheet is saved to your account.');
       return;
     }
     setSpreadsheetId(id);
     setPaste('');
     const synced = await remember(uid, id);
+    setFailed(false);
     setMsg(synced
       ? 'Next export will update this sheet.'
       : 'Saved on this device. It will be saved to your account when you are next online. Next export will update this sheet.');
@@ -70,14 +74,17 @@ export default function SheetExport({ data }: Props) {
     if (!confirm('Forget the saved Google Sheet on this device? The file stays in Drive. The next export creates a new Workout Export.')) return;
     forgetLocalSheetId(uid);
     setSpreadsheetId(null);
+    setFailed(false);
     setMsg('Saved sheet forgotten. The next export creates a new Workout Export.');
     try { await deleteExportSheetId(uid); } catch { /* the device copy is already gone */ }
   };
 
   const exportSheet = async () => {
     setMsg('');
+    setFailed(false);
     const blocked = sheetExportBlocked(paste);
     if (blocked) {
+      setFailed(true);
       setMsg(blocked);
       return;
     }
@@ -94,8 +101,10 @@ export default function SheetExport({ data }: Props) {
         setPaste('');
         setSpreadsheetId(result.spreadsheetId);
       }
+      setFailed(!result.ok);
       setMsg(result.message);
     } catch (error) {
+      setFailed(true);
       setMsg(sheetErrorMessage(error));
     } finally {
       setBusy(false);
@@ -125,7 +134,8 @@ export default function SheetExport({ data }: Props) {
       </label>
       <button className="ghost wide" type="button" disabled={busy || !paste.trim()} onClick={() => { void savePasted(); }}>Use this sheet</button>
       {spreadsheetId && <button className="ghost wide" type="button" disabled={busy} onClick={() => { void forget(); }}>Forget saved sheet</button>}
-      {msg && <p className="muted small" role="status">{msg}</p>}
+      {msg && <p className={failed ? 'banner warn' : 'muted small'} role={failed ? 'alert' : 'status'}>{msg}</p>}
+      {failed && <p className="muted small">Nothing was removed from the sheet. Use Export to Google Sheet to try again.</p>}
     </>
   );
 }

@@ -87,9 +87,9 @@ async function finishWorkout() {
   await openFinish();
   expect(exportDialog()).toBeNull();
   await click(findButton((label) => label === 'Save workout'));
-  expect(exportDialog()).toBeNull();
-  expect(document.body.textContent).toContain('Workout saved');
-  await click(findButton((label) => label === 'Export'));
+  expect(sessionCount()).toBeGreaterThan(0);
+  expect(exportDialog()?.textContent).toContain('Export to Google Sheet?');
+  expect(exportDialog()?.textContent).toContain('This workout is saved');
 }
 
 describe('finish workout sheet prompt', () => {
@@ -200,6 +200,24 @@ describe('finish workout sheet prompt', () => {
     expect(session.movements).toHaveLength(1);
     expect(session.movements[0].sets).toHaveLength(1);
     expect(session.movements[0].sets[0].done).toBe(true);
+  });
+
+  it('exports the elbow score chosen at the finish step', async () => {
+    await renderToday();
+    await openFinish();
+    await click(findButton((label) => label === '4'));
+    await click(findButton((label) => label === 'Save workout'));
+    expect(sessionCount()).toBe(1);
+    const dialog = exportDialog();
+    if (!dialog) throw new Error('export prompt missing');
+    expect(exportWorkoutSheet).not.toHaveBeenCalled();
+    await click(findButton((label) => label === 'Export', dialog));
+    const arg = vi.mocked(exportWorkoutSheet).mock.calls[0][0];
+    expect(arg.sessions).toHaveLength(1);
+    expect(arg.sessions[0]?.status).toBe('completed');
+    expect(arg.sessions[0]?.elbowPain).toBe(4);
+    expect(arg.sessions[0]?.letter).toMatch(/^[ABCD]$/);
+    expect(sessionCount()).toBe(1);
   });
 
   it('exports the finished workout when they accept', async () => {
