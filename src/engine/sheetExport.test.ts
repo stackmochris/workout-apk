@@ -317,3 +317,75 @@ describe('pushWorkoutSheet', () => {
     expect(sheetErrorMessage(Object.assign(new Error('x'), { code: 'auth/popup-closed-by-user' }))).toMatch(/not updated/);
   });
 });
+
+describe('freestyle sheet rows', () => {
+  function cellValue(cell: { userEnteredValue?: { stringValue: string } | { numberValue: number } }): string | number {
+    const value = cell.userEnteredValue;
+    if (!value) return '';
+    return 'stringValue' in value ? value.stringValue : value.numberValue;
+  }
+
+  function sessionRow(sessions: Session[], index: number): (string | number)[] {
+    const requests = replaceRequests({ sessions: 1, body: 2 }, sessions, []);
+    const rows = requests[0].updateCells.rows ?? [];
+    return (rows[index]?.values ?? []).map(cellValue);
+  }
+
+  it('writes one-off Freestyle to Sessions as F without storing a letter', () => {
+    const freestyle: Session = {
+      id: 'free',
+      date: '2026-11-21T18:00:00.000Z',
+      focus: 'Freestyle',
+      type: 'Normal',
+      status: 'completed',
+      effort: 6,
+      elbowPain: 4,
+      movements: [{
+        movementId: 'db-press',
+        name: 'DB press',
+        sets: [{ reps: 10, weight: 22, done: true, rir: 2 }],
+      }],
+      author: 'app',
+      updatedAt: '2026-11-21T18:00:00.000Z',
+    };
+    const cutDay: Session = {
+      ...freestyle,
+      id: 'day-d',
+      focus: 'Freestyle',
+      letter: 'D',
+      effort: 5,
+      elbowPain: 1,
+    };
+    const skipped: Session = {
+      ...freestyle,
+      id: 'free-skip',
+      date: '2026-11-21T19:00:00.000Z',
+      status: 'skipped',
+      movements: [],
+      effort: undefined,
+      elbowPain: undefined,
+    };
+
+    const headers = sessionRow([freestyle], 0);
+    const row = sessionRow([freestyle, cutDay, skipped], 1);
+    const day = sessionRow([freestyle, cutDay, skipped], 2);
+    const skippedRow = sessionRow([freestyle, cutDay, skipped], 3);
+    const at = (name: string) => headers.indexOf(name);
+
+    expect(headers).toEqual(SESSION_HEADERS);
+    expect(row[at('focus')]).toBe('Freestyle');
+    expect(row[at('status')]).toBe('completed');
+    expect(row[at('session_letter')]).toBe('F');
+    expect(row[at('effort')]).toBe(6);
+    expect(row[at('elbow_pain')]).toBe(4);
+    expect(row[at('rir')]).toBe(2);
+    expect(row[at('weight_kg')]).toBe(22);
+    expect(row[at('reps')]).toBe(10);
+    expect(day[at('session_letter')]).toBe('D');
+    expect(skippedRow[at('focus')]).toBe('Freestyle');
+    expect(skippedRow[at('status')]).toBe('skipped');
+    expect(skippedRow[at('session_letter')]).toBe('F');
+    expect(freestyle.letter).toBeUndefined();
+    expect(cutDay.letter).toBe('D');
+  });
+});

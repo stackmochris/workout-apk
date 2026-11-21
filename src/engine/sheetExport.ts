@@ -1,5 +1,5 @@
 import { BodyEntry, Session } from '../types';
-import { bodyTable, sessionsTable } from './csv';
+import { bodyTable, SESSION_HEADERS, sessionsTable } from './csv';
 
 /** Create and edit spreadsheets. Enough to create a file; full Drive access is not requested. */
 export const SHEETS_SCOPE = 'https://www.googleapis.com/auth/spreadsheets';
@@ -86,6 +86,22 @@ function cell(v: unknown): Cell {
 
 function grid(values: unknown[][]) {
   return values.map((row) => ({ values: row.map(cell) }));
+}
+
+/**
+ * Letter for the Sessions tab only. Stored sessions keep `letter` unset on a
+ * one-off Freestyle workout so cut schedule, deload, and e1RM logic ignore it.
+ * The sheet still writes F. A cut day whose focus is Freestyle keeps A–D.
+ */
+export function sheetSessionTable(sessions: Session[]): unknown[][] {
+  const table = sessionsTable(sessions).map((row) => row.slice());
+  const letterAt = SESSION_HEADERS.indexOf('session_letter');
+  const focusAt = SESSION_HEADERS.indexOf('focus');
+  for (let i = 1; i < table.length; i++) {
+    const row = table[i];
+    if (row[focusAt] === 'Freestyle' && (row[letterAt] == null || row[letterAt] === '')) row[letterAt] = 'F';
+  }
+  return table;
 }
 
 const DEFAULT_COLUMNS = 26;
@@ -260,7 +276,7 @@ function emptyGrid(sheetId: number): GridSnapshot {
 /** Write Sessions and Body from A1 on an empty workbook. Does not clear a tab. */
 export function replaceRequests(sheetIds: { sessions: number; body: number }, sessions: Session[], body: BodyEntry[]) {
   return [
-    ...buildSheetUpdates(emptyGrid(sheetIds.sessions), sessionsTable(sessions)).write,
+    ...buildSheetUpdates(emptyGrid(sheetIds.sessions), sheetSessionTable(sessions)).write,
     ...buildSheetUpdates(emptyGrid(sheetIds.body), bodyTable(body)).write,
   ];
 }
@@ -441,7 +457,7 @@ export async function pushWorkoutSheet(opts: {
   const values = await call(`${SHEETS_BASE}/${encodeURIComponent(id)}/values:batchGet?ranges=${encodeURIComponent(SESSIONS_TAB)}&ranges=${encodeURIComponent(BODY_TAB)}&valueRenderOption=UNFORMATTED_VALUE&majorDimension=ROWS`);
   const stored = readValueRanges(values);
   const plans = [
-    buildSheetUpdates({ ...sessionsTab, values: stored.get(SESSIONS_TAB) ?? [] }, sessionsTable(opts.sessions)),
+    buildSheetUpdates({ ...sessionsTab, values: stored.get(SESSIONS_TAB) ?? [] }, sheetSessionTable(opts.sessions)),
     buildSheetUpdates({ ...bodyTab, values: stored.get(BODY_TAB) ?? [] }, bodyTable(opts.body)),
   ];
   const expand = plans.flatMap((plan) => plan.expand);
